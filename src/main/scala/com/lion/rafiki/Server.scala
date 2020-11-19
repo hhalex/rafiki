@@ -12,6 +12,7 @@ import scala.concurrent.ExecutionContext.global
 object Server {
 
   def stream[F[_]: ConcurrentEffect](implicit T: Timer[F], C: ContextShift[F]): Stream[F, Nothing] = {
+    val env = System.getenv()
     for {
       client <- BlazeClientBuilder[F](global).stream
       helloWorldAlg = HelloWorld.impl[F]
@@ -30,7 +31,7 @@ object Server {
       finalHttpApp = Logger.httpApp(true, true)(httpApp)
 
       exitCode <- BlazeServerBuilder[F](global)
-        .bindHttp(8080, "0.0.0.0")
+        .bindHttp(env.getOrDefault("PORT", "8080").toInt, "0.0.0.0")
         .withHttpApp(finalHttpApp)
         .serve
     } yield exitCode
