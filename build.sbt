@@ -19,7 +19,9 @@ lazy val root = (project in file("."))
       "ch.qos.logback"  %  "logback-classic"     % LogbackVersion
     ),
     addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.10.3"),
-    addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1")
+    addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
+    watchSources ++= (baseDirectory.value / "public/ui" ** "*").get,
+    resourceDirectory in Compile := file("ui") / "build"
   )
 
 scalacOptions ++= Seq(
