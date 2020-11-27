@@ -1,13 +1,6 @@
 import scala.sys.process.Process
 
-/*
- * UI Build hook Scripts
- */
-
-// Execution status success.
 val Success = 0
-
-// Execution status failure.
 val Error = 1
 
 // True if build running operating system is windows.
@@ -15,7 +8,7 @@ val isWindows = System.getProperty("os.name").toLowerCase().contains("win")
 
 // Execute on commandline, depending on the operating system. Used to execute npm commands.
 def runOnCommandline(script: String)(implicit dir: File): Int = {
-  if(isWindows){ Process("cmd /c set CI=true&&" + script, dir) } else { Process("env CI=true " + script, dir) } }!
+  if(isWindows){ Process("cmd /c set CI=true&&" + script, dir) } else { Process(script, dir, "CI" -> "true") } }!
 
 // Check of node_modules directory exist in given directory.
 def isNodeModulesInstalled(implicit dir: File): Boolean = (dir / "node_modules").exists()
