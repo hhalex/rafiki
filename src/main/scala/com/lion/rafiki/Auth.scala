@@ -1,13 +1,12 @@
 package com.lion.rafiki
 
-import cats.{Applicative, FlatMap, Functor}
+import cats.Applicative
 import cats.data.OptionT
-import cats.syntax.functor._
-import cats.syntax.flatMap._
-import cats.effect.{IO, Sync}
+import cats.effect.IO
 import cats.effect.concurrent.Ref
+import cats.implicits.{catsSyntaxFoldOps, toTraverseOps}
 import io.chrisdavenport.fuuid.FUUID
-import shapeless.tag.@@
+import shapeless.tag.{@@, Tagger}
 import tsec.authentication.{BackingStore, BearerTokenAuthenticator, IdentityStore, TSecBearerToken, TSecTokenSettings}
 import tsec.common.SecureRandomId
 import tsec.passwordhashers.PasswordHash
@@ -17,7 +16,10 @@ import scala.concurrent.duration.DurationInt
 
 object Auth {
   type UserId = FUUID @@ User // shapeless.tag.@@
-
+  val tagFUUIDAsUserId = {
+    val tagger = new Tagger[User]
+    (t: FUUID) => tagger(t)
+  }
   case class User(id: UserId,
                   username: String,
                   password: PasswordHash[BCrypt])
@@ -46,4 +48,41 @@ object Auth {
       expiryDuration = 10.minutes,
       maxIdle = None
     ))
+
+  case class UsernamePasswordCredentials(username: String, password: String)
+  case class UserStore(
+                        identityStore: IdentityStore[IO, UserId, User],
+                        checkPassword: UsernamePasswordCredentials => IO[Option[User]]
+                      )
+
+  object UserStore {
+
+    def newUser(username: String, password: String): IO[User] =
+      Applicative[IO].map2(
+        FUUID.randomFUUID[IO].map(tagFUUIDAsUserId),
+        BCrypt.hashpw[IO](password)
+      )(User(_, username, _))
+
+    def validateUser(credentials: UsernamePasswordCredentials)(
+      users: List[User]): IO[Option[User]] =
+      users.findM(
+        user =>
+          BCrypt
+            .checkpwBool[IO](credentials.password, user.password)
+            .map(_ && credentials.username == user.username),
+      )
+
+    def apply(user: UsernamePasswordCredentials, users: UsernamePasswordCredentials*): IO[UserStore] =
+      for {
+        userList <- (user +: users)
+          .map(u => UserStore.newUser(u.username, u.password))
+          .toList
+          .sequence
+        users <- Ref.of[IO, Map[UserId, User]](userList.map(u => u.id -> u).toMap)
+      } yield
+        new UserStore(
+          (id: UserId) => OptionT(users.get.map(_.get(id))),
+          usr => users.get.map(_.values.toList).flatMap(validateUser(usr)(_))
+        )
+  }
 }
