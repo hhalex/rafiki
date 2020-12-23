@@ -2,9 +2,8 @@ package com.lion.rafiki
 
 
 import cats.effect.IO
-import com.lion.rafiki.Auth.{User, UserId}
+import com.lion.rafiki.auth.UserStore.{User, UserId}
 import io.chrisdavenport.fuuid.FUUID
-import shapeless.tag.@@
 import org.http4s._
 import org.http4s.implicits._
 import org.specs2.matcher.MatchResult

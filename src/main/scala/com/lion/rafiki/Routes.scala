@@ -1,7 +1,8 @@
 package com.lion.rafiki
 
 import cats.effect.{Blocker, ContextShift, IO}
-import com.lion.rafiki.Auth.{User, UserId, UsernamePasswordCredentials}
+import com.lion.rafiki.auth.UserStore.{User, UserId}
+import com.lion.rafiki.auth.UsernamePasswordCredentials
 import io.circe.Decoder
 import io.circe.generic.semiauto.deriveDecoder
 import org.http4s.circe.jsonOf
@@ -13,8 +14,7 @@ object Routes {
   val dsl = new Http4sDsl[IO]{}
   import dsl._
 
-  def loginRoute(
-                  auth: BearerTokenAuthenticator[IO, UserId, User],
+  def loginRoute(auth: BearerTokenAuthenticator[IO, UserId, User],
                   checkPassword: UsernamePasswordCredentials => IO[Option[User]]): HttpRoutes[IO] = {
     implicit val loginUserDecoder: Decoder[UsernamePasswordCredentials] = deriveDecoder
     implicit val entityLoginUserDecoder: EntityDecoder[IO, UsernamePasswordCredentials] =
@@ -26,7 +26,8 @@ object Routes {
           userOpt <- checkPassword(user)
         } yield userOpt).flatMap {
           case Some(user) => auth.create(user.id).map(auth.embed(Response(Status.Ok), _))
-          case None => IO.pure(Response[IO](Status.Unauthorized))
+          case None =>
+            IO.pure(Response[IO](Status.Unauthorized))
         }
     }
   }
