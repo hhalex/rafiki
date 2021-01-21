@@ -8,11 +8,9 @@ import tsec.authentication.{BackingStore, TSecBearerToken}
 import tsec.common.SecureRandomId
 
 object TokenStore {
-  def apply(ref: Ref[IO, Map[SecureRandomId, TSecBearerToken[UserId]]]): BackingStore[
-    IO,
-    SecureRandomId,
-    TSecBearerToken[UserId]] =
-    new BackingStore[IO, SecureRandomId, TSecBearerToken[UserId]] {
+  type BS = BackingStore[IO, SecureRandomId, TSecBearerToken[UserId]]
+  def apply(ref: Ref[IO, Map[SecureRandomId, TSecBearerToken[UserId]]]): BS =
+    new BS {
       override def put(elem: TSecBearerToken[UserId]): IO[TSecBearerToken[UserId]] =
         ref.modify(store => (store + (elem.id -> elem), elem))
 
@@ -24,7 +22,7 @@ object TokenStore {
         OptionT(ref.get.map(_.get(id)))
     }
 
-  val empty: IO[BackingStore[IO, SecureRandomId, TSecBearerToken[UserId]]] = for {
+  val empty: IO[BS] = for {
     tokens <- Ref.of[IO, Map[SecureRandomId, TSecBearerToken[UserId]]](Map.empty)
   } yield TokenStore(tokens)
 }

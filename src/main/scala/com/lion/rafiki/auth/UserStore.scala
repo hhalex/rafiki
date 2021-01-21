@@ -7,7 +7,8 @@ import cats.effect.concurrent.Ref
 import cats.implicits.{catsSyntaxFoldOps, toTraverseOps}
 import com.lion.rafiki.auth.UserStore.{User, UserId}
 import io.chrisdavenport.fuuid.FUUID
-import shapeless.tag.{@@, Tagger}
+import shapeless.tag
+import shapeless.tag.@@
 import tsec.authentication.IdentityStore
 import tsec.passwordhashers.PasswordHash
 import tsec.passwordhashers.jca.BCrypt
@@ -20,10 +21,7 @@ case class UserStore(
 object UserStore {
 
   type UserId = FUUID @@ User // shapeless.tag.@@
-  val tagFUUIDAsUserId = {
-    val tagger = new Tagger[User]
-    (t: FUUID) => tagger(t)
-  }
+  val tagFUUIDAsUserId = tag[User](_: FUUID)
   case class User(id: UserId,
                   username: String,
                   password: PasswordHash[BCrypt])
