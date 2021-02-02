@@ -30,7 +30,7 @@ class HelloWorldSpec extends org.specs2.mutable.Specification {
     val userid = FUUID.fromUUID(UUID.randomUUID()).asInstanceOf[UserId]
     val getHW = SecuredRequest[IO, User, TSecBearerToken[UserId]](
       Request[IO](Method.GET, uri"/hello/world"),
-      User(userid, "world", PasswordHash[BCrypt]("mdp")),
+      User(userid, None, None, "world", PasswordHash[BCrypt]("mdp")),
       TSecBearerToken(SecureRandomId(""), userid, Instant.MAX, None)
     )
     val helloWorld = HelloWorld.impl[IO]

@@ -2,6 +2,7 @@ val Http4sVersion = "0.21.8"
 val TsecVersion = "0.2.1"
 val FuuidVersion = "0.4.0"
 val CirceVersion = "0.13.0"
+val DoobieVersion = "0.9.0"
 val Specs2Version = "4.10.5"
 val LogbackVersion = "1.2.3"
 
@@ -21,6 +22,9 @@ lazy val root = (project in file("."))
       "io.github.jmcardon"  %% "tsec-http4s"         % TsecVersion,
       "io.chrisdavenport"   %% "fuuid"               % FuuidVersion,
       "io.circe"            %% "circe-generic"       % CirceVersion,
+      "org.tpolecat"        %% "doobie-core"         % DoobieVersion,
+      "org.tpolecat"        %% "doobie-postgres"     % DoobieVersion,
+      "org.tpolecat"        %% "doobie-specs2"       % DoobieVersion % "test", // Specs2 support for typechecking statements.
       "org.specs2"          %% "specs2-core"         % Specs2Version % "test",
       "ch.qos.logback"      %  "logback-classic"     % LogbackVersion
     ),
