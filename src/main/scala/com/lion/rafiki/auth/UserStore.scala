@@ -46,11 +46,11 @@ object UserStore {
     new UserStore(
       // First we check in the list of hot users, then we search the database if we don't find anything
       (id: UserId) => OptionT(userList.map(_.find(_.id == id)))
-        .orElse(OptionT(users.getById(id).transact(xa))),
+        .orElseF(users.getById(id).transact(xa)),
       // We validate first against the hot users's list before checking against the database
       creds => for {
         maybeUser <- OptionT(userList.map(_.find(_.username == creds.username)))
-          .orElse(OptionT(users.getByEmail(creds.username).transact(xa)))
+          .orElseF(users.getByEmail(creds.username).transact(xa))
           .value
         validPassword <- maybeUser match {
           case Some(u) => BCrypt.checkpwBool[IO](creds.password, u.password)
