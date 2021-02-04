@@ -16,7 +16,6 @@ import org.http4s.server.middleware.Logger
 import tsec.authentication.{BackingStore, BearerTokenAuthenticator, SecuredRequestHandler, TSecBearerToken, TSecTokenSettings}
 import tsec.common.SecureRandomId
 
-import java.net.URI
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.global
 import scala.concurrent.duration.DurationInt
@@ -44,23 +43,23 @@ object Main extends IOApp {
 
   def run(args: List[String]) = {
     implicit val blocker = Blocker.liftExecutionContext(ExecutionContext.global)
-    val env = System.getenv()
+
 
     for {
-      c <- Stream.eval(Conf[IO](env))
+      conf <- Stream.eval(Conf[IO]())
       xa = Transactor.fromDriverManager[IO](
         "org.postgresql.Driver",
-        c.dbUrl,
-        c.dbUser,
-        c.dbPassword,
+        conf.dbUrl,
+        conf.dbUser,
+        conf.dbPassword,
         blocker
       )
       client <- BlazeClientBuilder[IO](global).stream
       _ <- Stream.eval(create.users.run.transact(xa))
-      initialUserStore = UserStore(xa, UsernamePasswordCredentials("username", "pass"))
+      initialUserStore = UserStore(xa, conf.hotUsersList)
       tokenStore <- Stream.eval(TokenStore.empty)
       exitCode <- BlazeServerBuilder[IO](global)
-        .bindHttp(c.port, c.host)
+        .bindHttp(conf.port, conf.host)
         .withHttpApp(Logger.httpApp[IO](true, true)(
           createHttpApp(initialUserStore, tokenStore, client)
         ))

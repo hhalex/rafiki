@@ -37,24 +37,24 @@ object UserStore {
       BCrypt.hashpw[IO](password)
     )(User(_, None, None, username, _))
 
-  def apply(xa: Transactor.Aux[IO, Unit], hot_users: UsernamePasswordCredentials*): UserStore = {
-    val userList = hot_users
+  def apply(xa: Transactor.Aux[IO, Unit], hot_users: Seq[UsernamePasswordCredentials]): UserStore = {
+    def userList() = hot_users
       .map(u => newHotUser(u.username, u.password))
       .toList
       .sequence
 
     new UserStore(
       // First we check in the list of hot users, then we search the database if we don't find anything
-      (id: UserId) => OptionT(userList.map(_.find(_.id == id)))
+      (id: UserId) => OptionT(userList().map(_.find(_.id == id)))
         .orElseF(users.getById(id).transact(xa)),
       // We validate first against the hot users's list before checking against the database
       creds => for {
-        maybeUser <- OptionT(userList.map(_.find(_.username == creds.username)))
+        maybeUser <- OptionT(userList().map(_.find(_.username == creds.username)))
           .orElseF(users.getByEmail(creds.username).transact(xa))
           .value
         validPassword <- maybeUser match {
           case Some(u) => BCrypt.checkpwBool[IO](creds.password, u.password)
-          case None => IO.raiseError(new Exception(s"User '$creds' not found"))
+          case None => IO.pure(false)
         }
       } yield if (validPassword) maybeUser else None
     )

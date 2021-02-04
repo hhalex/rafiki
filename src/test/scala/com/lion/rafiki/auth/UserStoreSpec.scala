@@ -1,22 +1,38 @@
 package com.lion.rafiki.auth
 
-import cats.effect.IO
+import cats.effect.{Blocker, IO, Resource}
 import com.lion.rafiki.auth.UserStore.{UserId, tagFUUIDAsUserId}
+import doobie.{ExecutionContexts, KleisliInterpreter}
+import doobie.util.transactor.{Strategy, Transactor}
 import io.chrisdavenport.fuuid.FUUID
 import org.specs2.Specification
-/*
-class UserStoreSpec extends Specification { def is = s2"""
+
+import java.sql.Connection
+
+
+class UserStoreSpec extends Specification {
+  def is = s2"""
       User Store:
-        retrieves existing users ${buildRefStore.unsafeRunSync()}
+        "username" should be found: $username
+
     """
+  implicit val cs = IO.contextShift(ExecutionContexts.synchronous)
+
+  val transactor = Transactor[IO, Unit](
+    (),
+    _ => Resource.pure[IO, Connection](null),
+    KleisliInterpreter[IO](Blocker.liftExecutionContext(ExecutionContexts.synchronous)).ConnectionInterpreter,
+    Strategy.void
+  )
 
   val user = UsernamePasswordCredentials("username", "password")
-  val buildRefStore = for {
-    userStore = UserStore(user)
-    retrievedUser <- userStore.checkPassword(user)
-  } yield retrievedUser.map(_.username) must beSome(user.username)
+
+  val userStore = UserStore(transactor, Seq(user))
+
+  def username = userStore.checkPassword(user).unsafeRunSync() must beSome
+  //val another = userStore.checkPassword(UsernamePasswordCredentials("another", "pass")).unsafeRunSync() must beNone
 }
 
 object UserStoreSpec {
   def randomUserId: IO[UserId] = FUUID.randomFUUID[IO].map(tagFUUIDAsUserId)
-}*/
+}
