@@ -1,8 +1,8 @@
 package com.lion.rafiki
 
 import cats.effect.{Blocker, ContextShift, IO}
-import com.lion.rafiki.auth.UserStore.{User, UserId}
 import com.lion.rafiki.auth.UsernamePasswordCredentials
+import com.lion.rafiki.sql.users
 import io.circe.Decoder
 import io.circe.generic.semiauto.deriveDecoder
 import org.http4s.circe.jsonOf
@@ -14,8 +14,8 @@ object Routes {
   val dsl = new Http4sDsl[IO]{}
   import dsl._
 
-  def loginRoute(auth: BearerTokenAuthenticator[IO, UserId, User],
-                  checkPassword: UsernamePasswordCredentials => IO[Option[User]]): HttpRoutes[IO] = {
+  def loginRoute(auth: BearerTokenAuthenticator[IO, users.Id, users.T],
+                  checkPassword: UsernamePasswordCredentials => IO[Option[users.T]]): HttpRoutes[IO] = {
     implicit val loginUserDecoder: Decoder[UsernamePasswordCredentials] = deriveDecoder
     implicit val entityLoginUserDecoder: EntityDecoder[IO, UsernamePasswordCredentials] =
       jsonOf[IO, UsernamePasswordCredentials]
@@ -40,7 +40,7 @@ object Routes {
       } yield resp
   }
 
-  def helloWorldRoutes(H: HelloWorld[IO]) = TSecAuthService[User, TSecBearerToken[UserId], IO] {
+  def helloWorldRoutes(H: HelloWorld[IO]) = TSecAuthService[users.T, TSecBearerToken[users.Id], IO] {
     case GET -> Root / "hello" / name asAuthed user =>
       for {
         greeting <- H.hello(HelloWorld.Name(user.username))

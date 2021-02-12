@@ -2,7 +2,7 @@ package com.lion.rafiki
 
 
 import cats.effect.IO
-import com.lion.rafiki.auth.UserStore.{User, UserId}
+import com.lion.rafiki.sql.users
 import io.chrisdavenport.fuuid.FUUID
 import org.http4s._
 import org.http4s.implicits._
@@ -27,10 +27,10 @@ class HelloWorldSpec extends org.specs2.mutable.Specification {
   }
 
   private[this] val retHelloWorld: Response[IO] = {
-    val userid = FUUID.fromUUID(UUID.randomUUID()).asInstanceOf[UserId]
-    val getHW = SecuredRequest[IO, User, TSecBearerToken[UserId]](
+    val userid = FUUID.fromUUID(UUID.randomUUID()).asInstanceOf[users.Id]
+    val getHW = SecuredRequest[IO, users.T, TSecBearerToken[users.Id]](
       Request[IO](Method.GET, uri"/hello/world"),
-      User(userid, None, None, "world", PasswordHash[BCrypt]("mdp")),
+      users.T(userid, None, None, "world", PasswordHash[BCrypt]("mdp")),
       TSecBearerToken(SecureRandomId(""), userid, Instant.MAX, None)
     )
     val helloWorld = HelloWorld.impl[IO]

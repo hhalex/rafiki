@@ -4,38 +4,26 @@ import cats.Applicative
 import cats.data.OptionT
 import cats.effect.IO
 import cats.implicits.toTraverseOps
-import com.lion.rafiki.auth.UserStore.{User, UserId}
 import com.lion.rafiki.sql.users
 import doobie.util.transactor.Transactor
-import io.chrisdavenport.fuuid.FUUID
-import shapeless.tag
-import shapeless.tag.@@
 import tsec.authentication.IdentityStore
-import tsec.passwordhashers.PasswordHash
 import tsec.passwordhashers.jca.BCrypt
 import doobie.implicits._
 
 case class UserStore(
-                      identityStore: IdentityStore[IO, UserId, User],
-                      checkPassword: UsernamePasswordCredentials => IO[Option[User]]
+                      identityStore: IdentityStore[IO, users.Id, users.T],
+                      checkPassword: UsernamePasswordCredentials => IO[Option[users.T]]
                     )
 
 object UserStore {
 
-  type UserId = FUUID @@ User // shapeless.tag.@@
-  val tagFUUIDAsUserId = tag[User](_: FUUID)
-  case class User(id: UserId,
-                  firstname: Option[String],
-                  name: Option[String],
-                  username: String,
-                  password: PasswordHash[BCrypt])
-
   // A hot user is a user generated at startup time.
-  def newHotUser(username: String, password: String): IO[User] =
+  def newHotUser(username: String, password: String): IO[users.T] = {
     Applicative[IO].map2(
-      FUUID.randomFUUID[IO].map(tagFUUIDAsUserId),
+      IO.pure(users.tagSerial(username.hashCode)),
       BCrypt.hashpw[IO](password)
-    )(User(_, None, None, username, _))
+    )(users.T(_, None, None, username, _))
+  }
 
   def apply(xa: Transactor.Aux[IO, Unit], hot_users: Seq[UsernamePasswordCredentials]): UserStore = {
     def userList() = hot_users
@@ -45,8 +33,8 @@ object UserStore {
 
     new UserStore(
       // First we check in the list of hot users, then we search the database if we don't find anything
-      (id: UserId) => OptionT(userList().map(_.find(_.id == id)))
-        .orElseF(users.getById(id).transact(xa)),
+      (id: users.Id) => OptionT(userList().map(_.find(_.id == id)))
+        .orElseF(users.getById(id).transact(xa).map(Some(_))),
       // We validate first against the hot users's list before checking against the database
       creds => for {
         maybeUser <- OptionT(userList().map(_.find(_.username == creds.username)))

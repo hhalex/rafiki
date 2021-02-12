@@ -2,7 +2,7 @@ package com.lion.rafiki.auth
 
 import cats.effect.IO
 import cats.effect.concurrent.Ref
-import com.lion.rafiki.auth.UserStore.{UserId, tagFUUIDAsUserId}
+import com.lion.rafiki.sql.users
 import io.chrisdavenport.fuuid.FUUID
 import org.specs2.Specification
 import tsec.authentication.TSecBearerToken
@@ -19,8 +19,8 @@ class TokenStoreSpec extends Specification { def is = s2"""
 
 
   val buildRefStore = for {
-    token <- FUUID.randomFUUID[IO].map(tagFUUIDAsUserId).map(TSecBearerToken(SecureRandomId("token"), _, Instant.now(), None))
-    tokens <- Ref.of[IO, Map[SecureRandomId, TSecBearerToken[UserId]]](Map.empty)
+    token <- IO.pure(users.tagSerial(1)).map(TSecBearerToken(SecureRandomId("token"), _, Instant.now(), None))
+    tokens <- Ref.of[IO, Map[SecureRandomId, TSecBearerToken[users.Id]]](Map.empty)
     store = TokenStore(tokens)
     _ <- store.put(token)
   } yield (store, token)
@@ -41,7 +41,7 @@ class TokenStoreSpec extends Specification { def is = s2"""
   val update = for {
     storeAndToken <- buildRefStore
     (store, token) = storeAndToken
-    token2 <- FUUID.randomFUUID[IO].map(tagFUUIDAsUserId).map(TSecBearerToken(token.id, _, Instant.now(), None))
+    token2 <- IO.pure(users.tagSerial(1)).map(TSecBearerToken(token.id, _, Instant.now(), None))
     _ <- store.update(token2)
     tokenRetrieved <- store.get(token.id).value
   } yield tokenRetrieved must beSome(token2)

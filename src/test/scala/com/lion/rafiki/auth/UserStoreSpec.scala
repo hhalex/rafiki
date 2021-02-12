@@ -1,10 +1,9 @@
 package com.lion.rafiki.auth
 
 import cats.effect.{Blocker, IO, Resource}
-import com.lion.rafiki.auth.UserStore.{UserId, tagFUUIDAsUserId}
+import com.lion.rafiki.sql.users
 import doobie.{ExecutionContexts, KleisliInterpreter}
 import doobie.util.transactor.{Strategy, Transactor}
-import io.chrisdavenport.fuuid.FUUID
 import org.specs2.Specification
 
 import java.sql.Connection
@@ -34,5 +33,5 @@ class UserStoreSpec extends Specification {
 }
 
 object UserStoreSpec {
-  def randomUserId: IO[UserId] = FUUID.randomFUUID[IO].map(tagFUUIDAsUserId)
+  def randomUserId: IO[users.Id] = IO.pure(users.tagSerial(1))
 }
