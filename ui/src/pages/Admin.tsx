@@ -4,12 +4,11 @@ import Tabs from '@material-ui/core/Tabs';
 import Tab from '@material-ui/core/Tab';
 import Box from '@material-ui/core/Box';
 import AddIcon from '@material-ui/icons/Add';
-import { TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Fab, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField, Typography } from '@material-ui/core';
+import { TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Fab, Button, Dialog, DialogActions, DialogContent, TextField, Typography, DialogTitle } from '@material-ui/core';
 
 import EditIcon from '@material-ui/icons/Edit';
 import DeleteIcon from '@material-ui/icons/Delete';
-import { useRecoilValue } from 'recoil';
-import { bearerToken } from '../atoms/auth';
+import { AuthenticatedFetch } from '../atoms/Auth';
 
 
 interface TabPanelProps {
@@ -77,7 +76,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
-export default function VerticalTabs() {
+export default function AdminView({authFetch}: {authFetch: AuthenticatedFetch}) {
   const classes = useStyles();
   const [value, setValue] = React.useState(0);
 
@@ -109,7 +108,7 @@ export default function VerticalTabs() {
                   <hr style={{ width: "100%" }} />
           </TabPanel>
           <TabPanel value={value} index={1}>
-            <CompanyCRUD />
+            <CompanyCRUD authFetch={authFetch} />
           </TabPanel>
           <TabPanel value={value} index={2}>
             Employés
@@ -124,16 +123,6 @@ export default function VerticalTabs() {
     </div>
   );
 }
-
-function createData(id: string, name: string, email: string) {
-  return { name, email, id };
-}
-
-const rows = [
-  createData("10cc8266-d161-40ce-849f-9d0b6406b627",'Apple Inc.', "pdg@apple.com"),
-  createData("1e1e91e5-7e96-4665-8009-997f8f4aa0a7", 'Tesla', "pdg@tesla.com"),
-  createData("f8bbec7b-a730-49d6-9ebf-c8b8ee17ac1b", 'Dogecoin', "pdg@doge.com"),
-];
 
 const useStylesCRUD = makeStyles({
   root: {},
@@ -150,10 +139,8 @@ const useStylesCRUD = makeStyles({
   }
 });
 
-const CompanyCRUD = () => {
+const CompanyCRUD = ({authFetch}: {authFetch: AuthenticatedFetch}) => {
   const classes = useStylesCRUD();
-
-  const bt = useRecoilValue(bearerToken) as string;
 
   type CompanyFormData = {
     id?: string,
@@ -188,8 +175,8 @@ const CompanyCRUD = () => {
     setCompanyFormData(undefined);
   };
 
-  const loadCompanies = () => fetch("/company", {headers: [["Authorization", bt]]})
-    .then(b => b.json().then(setCompaniesList))
+  const loadCompanies = () => authFetch.get("/company")
+    .then(b => b && b.json().then(setCompaniesList))
     .catch(() => {});
 
   const editOrAddCompany = (c: CompanyFormData) => {
@@ -200,24 +187,20 @@ const CompanyCRUD = () => {
       name: c.name,
       rh_user_password: c.password ? c.password : undefined
     };
-    return fetch("/company", {
-      headers: [["Authorization", bt]],
-      method: add ? "POST" : "PUT",
-      body: JSON.stringify(data)
-    }).then(loadCompanies)
-    .catch(() => {});
-  }
+    const fetchMethod = add ? authFetch.post : authFetch.put;
+    return fetchMethod("/company", JSON.stringify(data))
+      .then(loadCompanies)
+      .catch(() => {});
+  };
 
-  const createHandleDeleteCompany = (companyId: string) => () => {
-    return fetch("/company", {
-      headers: [["Authorization", bt]],
-      method: "DELETE",
-      body: companyId
-    }).then(loadCompanies)
-    .catch(() => {});
-  }
+  const createHandleDeleteCompany = (companyId: string) => () => 
+    authFetch.delete("/company", companyId)
+      .then(loadCompanies)
+      .catch(() => {});
 
   useEffect(loadCompanies as any, []);
+
+  const editOrAddLabel = companyFormData?.id ? "Editer" : "Ajouter";
 
   return <div className={classes.root}>
     <TableContainer className={classes.table}>
@@ -239,7 +222,7 @@ const CompanyCRUD = () => {
               <TableCell>{company.name}</TableCell>
               <TableCell>{user.username}</TableCell>
               <TableCell align="right">
-                <EditIcon className={classes.editIcon} onClick={createHandleOpenEditCompanyForm(company.id, company.name, "email")}/>
+                <EditIcon className={classes.editIcon} onClick={createHandleOpenEditCompanyForm(company.id, company.name, user.username)}/>
                 <DeleteIcon className={classes.deleteIcon} onClick={createHandleDeleteCompany(company.id)}/>
               </TableCell>
             </TableRow>
@@ -251,7 +234,7 @@ const CompanyCRUD = () => {
       <AddIcon/>
     </Fab>
     {companyFormData && <Dialog open={!!companyFormData} onClose={handleClose} aria-labelledby="form-dialog-title">
-      <DialogTitle id="form-dialog-title">{companyFormData.id ? "Editer" : "Ajouter"} une entreprise</DialogTitle>
+      <DialogTitle id="form-dialog-title">{editOrAddLabel} une entreprise</DialogTitle>
       <DialogContent>
         <TextField
           id="id"
@@ -297,7 +280,7 @@ const CompanyCRUD = () => {
           Annuler
         </Button>
         <Button onClick={() => editOrAddCompany(companyFormData).then(handleClose)} color="primary">
-          Ajouter
+          {editOrAddLabel}
         </Button>
       </DialogActions>
     </Dialog>}

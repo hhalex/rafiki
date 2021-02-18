@@ -1,12 +1,12 @@
 import React from "react";
-import { Login } from "./pages/Login";
-import { useRecoilValue } from "recoil";
-import { bearerToken } from "./atoms/auth";
+import { AuthenticatedFetch, AuthProvider } from "./atoms/Auth";
 import Admin from "./pages/Admin";
 
 export const App = () => {
-    const bt = useRecoilValue(bearerToken);
-    return bt 
-        ? <Admin />
-        : <Login />
+
+    return <AuthProvider>{
+        ({authFetch}: {authFetch: AuthenticatedFetch}) => {
+            return <Admin authFetch={authFetch}/>
+    }}</AuthProvider>
 };
+

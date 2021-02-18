@@ -10,8 +10,6 @@ import LockOutlinedIcon from '@material-ui/icons/LockOutlined';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/core/styles';
 import Container from '@material-ui/core/Container';
-import { atom, useRecoilState, useSetRecoilState } from 'recoil';
-import { bearerToken } from '../atoms/auth';
 
 const Copyright = () => 
     <Typography variant="body2" color="textSecondary" align="center">
@@ -40,26 +38,15 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const creds = atom({
-  key: "creds",
-  default: {
-    username: "",
-    password: ""
-  }
-});
-
-export const Login = () => {
+export const Login = ({updateAuthFetchWithResponse}: {updateAuthFetchWithResponse: (r: Response) => Response}) => {
   const classes = useStyles();
 
-  const setBearerToken = useSetRecoilState(bearerToken);
-  const [credentials, setCredentials] = useRecoilState(creds);
+  const [credentials, setCredentials] = React.useState({ username: "", password: "" });
 
   const onSubmit = () => fetch("/login", {
     method: "POST",
     body: JSON.stringify(credentials)
-  }).then(r => {
-    setBearerToken(_ => r.headers.get("Authorization") ?? undefined);
-  });
+  }).then(updateAuthFetchWithResponse);
 
   return (
     <Container component="main" maxWidth="xs">
