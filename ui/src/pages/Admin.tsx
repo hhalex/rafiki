@@ -80,7 +80,7 @@ export default function AdminView({authFetch}: {authFetch: AuthenticatedFetch}) 
   const classes = useStyles();
   const [value, setValue] = React.useState(0);
 
-  const handleChange = (event: React.ChangeEvent<{}>, newValue: number) => {
+  const handleChange = (_: React.ChangeEvent<{}>, newValue: number) => {
     setValue(newValue);
   };
 
@@ -143,21 +143,21 @@ const CompanyCRUD = ({authFetch}: {authFetch: AuthenticatedFetch}) => {
   const classes = useStylesCRUD();
 
   type CompanyFormData = {
-    id?: string,
+    id?: number,
     name?: string,
-    email?: string,
-    password?: string,
+    rh_user_id?: number
+    rh_user_email?: string,
+    rh_user_password?: string,
   };
 
-  type CompanyANDUser = [{
-    id: string,
+  type CompanyANDUser = {
+    id: number,
     name: string,
-    rh_user: string
-  },
-  {
-    id: string,
-    username: string
-  }];
+    rh_user: {
+      id: number,
+      username: string
+    }
+  };
 
   const [companiesList, setCompaniesList] = React.useState<CompanyANDUser[]>([]);
 
@@ -167,8 +167,14 @@ const CompanyCRUD = ({authFetch}: {authFetch: AuthenticatedFetch}) => {
     setCompanyFormData({});
   }
 
-  const createHandleOpenEditCompanyForm = (id: string, name: string, email: string) => () => {
-    setCompanyFormData({id, name, email});
+  const createHandleOpenEditCompanyForm = (c: CompanyANDUser) => () => {
+    setCompanyFormData({
+      id: c.id,
+      name: c.name,
+      rh_user_id: c.rh_user.id,
+      rh_user_email: c.rh_user.username,
+      rh_user_password: ""
+    });
   }
 
   const handleClose = () => {
@@ -183,18 +189,23 @@ const CompanyCRUD = ({authFetch}: {authFetch: AuthenticatedFetch}) => {
     const add = !c.id;
     const data = {
       id: c.id,
-      rh_user_email: c.email,
       name: c.name,
-      rh_user_password: c.password ? c.password : undefined
+      rh_user: {
+        id: c.rh_user_id,
+        username: c.rh_user_email,
+        password: c.rh_user_password
+      }
     };
-    const fetchMethod = add ? authFetch.post : authFetch.put;
-    return fetchMethod("/company", JSON.stringify(data))
+    const fetchMethod = add 
+      ? authFetch.post("/company", JSON.stringify(data))
+      : authFetch.put(`/company/${c.id}`, JSON.stringify(data));
+    return fetchMethod
       .then(loadCompanies)
       .catch(() => {});
   };
 
-  const createHandleDeleteCompany = (companyId: string) => () => 
-    authFetch.delete("/company", companyId)
+  const createHandleDeleteCompany = (companyId: number) => () => 
+    authFetch.delete(`/company/${companyId}`)
       .then(loadCompanies)
       .catch(() => {});
 
@@ -214,15 +225,15 @@ const CompanyCRUD = ({authFetch}: {authFetch: AuthenticatedFetch}) => {
           </TableRow>
         </TableHead>
         <TableBody>
-          {companiesList.map(([company, user]) => (
+          {companiesList.map(company => (
             <TableRow key={company.id}>
               <TableCell component="th" scope="row">
                 {company.id}
               </TableCell>
               <TableCell>{company.name}</TableCell>
-              <TableCell>{user.username}</TableCell>
+              <TableCell>{company.rh_user.username}</TableCell>
               <TableCell align="right">
-                <EditIcon className={classes.editIcon} onClick={createHandleOpenEditCompanyForm(company.id, company.name, user.username)}/>
+                <EditIcon className={classes.editIcon} onClick={createHandleOpenEditCompanyForm(company)}/>
                 <DeleteIcon className={classes.deleteIcon} onClick={createHandleDeleteCompany(company.id)}/>
               </TableCell>
             </TableRow>
@@ -261,8 +272,8 @@ const CompanyCRUD = ({authFetch}: {authFetch: AuthenticatedFetch}) => {
           fullWidth
           margin="normal"
           variant="outlined"
-          defaultValue={companyFormData.email}
-          onChange={e => {setCompanyFormData(old => ({...old, email: e.target.value}))}}
+          defaultValue={companyFormData.rh_user_email}
+          onChange={e => {setCompanyFormData(old => ({...old, rh_user_email: e.target.value}))}}
 
         />
         <TextField
@@ -272,7 +283,7 @@ const CompanyCRUD = ({authFetch}: {authFetch: AuthenticatedFetch}) => {
           fullWidth
           margin="normal"
           variant="outlined"
-          onChange={e => {setCompanyFormData(old => ({...old, password: e.target.value}))}}
+          onChange={e => {setCompanyFormData(old => ({...old, rh_user_password: e.target.value}))}}
         />
       </DialogContent>
       <DialogActions>

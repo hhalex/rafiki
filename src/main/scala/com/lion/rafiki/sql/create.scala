@@ -1,13 +1,8 @@
 package com.lion.rafiki.sql
 
 import doobie.implicits.toSqlInterpolator
-import cats._
-import cats.data._
-import cats.effect._
 import cats.implicits._
-import doobie._
 import doobie.implicits._
-import doobie.util.ExecutionContexts
 
 object create {
   val users =

@@ -11,7 +11,7 @@ lazy val root = (project in file("."))
     organization := "lion",
     name := "rafiki",
     version := "0.0.1-SNAPSHOT",
-    scalaVersion := "2.13.3",
+    scalaVersion := "2.13.5",
     libraryDependencies ++= Seq(
       "org.http4s"          %% "http4s-blaze-server" % Http4sVersion,
       "org.http4s"          %% "http4s-blaze-client" % Http4sVersion,
@@ -28,7 +28,7 @@ lazy val root = (project in file("."))
       "org.specs2"          %% "specs2-core"         % Specs2Version % "test",
       "ch.qos.logback"      %  "logback-classic"     % LogbackVersion
     ),
-    addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.10.3"),
+    addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.11.3" cross CrossVersion.full),
     addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
     watchSources ++= (baseDirectory.value / "public/ui" ** "*").get,
     resourceDirectory in Compile := file("ui") / "build"
@@ -41,6 +41,7 @@ scalacOptions ++= Seq(
   "-language:postfixOps",
   "-feature",
   "-Xfatal-warnings",
+  "-Xlog-implicits"
 )
 
 enablePlugins(JavaServerAppPackaging)

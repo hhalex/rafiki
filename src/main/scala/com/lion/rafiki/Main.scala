@@ -2,49 +2,26 @@ package com.lion.rafiki
 
 import cats.effect.{Blocker, ExitCode, IO, IOApp}
 import cats.implicits.toSemigroupKOps
-import com.lion.rafiki.api.Admin
 import com.lion.rafiki.auth.{TokenStore, UserStore}
-import com.lion.rafiki.sql.{create, users}
+import com.lion.rafiki.domain.{Company, User}
+import com.lion.rafiki.endpoints.{Authentication, CompanyEndpoints, UserEndpoints}
+import com.lion.rafiki.sql.{DoobieCompanyRepo, DoobieUserRepo, create}
 import doobie.util.transactor.Transactor
 import doobie.implicits._
+import org.http4s.implicits._
 import fs2.Stream
-import org.http4s.client.Client
-import org.http4s.client.blaze.BlazeClientBuilder
-import org.http4s.implicits.http4sKleisliResponseSyntaxOptionT
+import org.http4s.server.Router
 import org.http4s.server.blaze.BlazeServerBuilder
 import org.http4s.server.middleware.Logger
-import tsec.authentication.{BackingStore, BearerTokenAuthenticator, SecuredRequestHandler, TSecBearerToken, TSecTokenSettings}
-import tsec.common.SecureRandomId
+import tsec.authentication.{BearerTokenAuthenticator, SecuredRequestHandler, TSecTokenSettings}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.global
 import scala.concurrent.duration.DurationInt
 
 object Main extends IOApp {
-  def createHttpApp(userStore: UserStore, tokenStore: BackingStore[IO, SecureRandomId, TSecBearerToken[users.Id]], client: Client[IO], xa: Transactor.Aux[IO, Unit])(implicit b: Blocker) = {
-    val auth = BearerTokenAuthenticator(
-      tokenStore,
-      userStore.identityStore,
-      TSecTokenSettings(
-        expiryDuration = 10.minutes,
-        maxIdle = None
-      ))
-
-    val helloWorldAlg = HelloWorld.impl[IO]
-    val jokeAlg = Jokes.impl[IO](client)
-    val loginRoutes = Routes.loginRoute(auth, userStore.checkPassword)
-    val crudCompanies = Admin.createCompanyCRUD(xa)
-    val securedRoutes = SecuredRequestHandler(auth).liftService(
-      // Private routes
-      Routes.helloWorldRoutes(helloWorldAlg) <+> crudCompanies
-    )
-
-    (Routes.uiRoutes <+> Routes.jokeRoutes(jokeAlg) <+> loginRoutes <+> securedRoutes).orNotFound
-  }
-
   def run(args: List[String]) = {
     implicit val blocker = Blocker.liftExecutionContext(ExecutionContext.global)
-
 
     for {
       conf <- Stream.eval(Conf[IO]())
@@ -55,14 +32,37 @@ object Main extends IOApp {
         conf.dbPassword,
         blocker
       )
-      client <- BlazeClientBuilder[IO](global).stream
       _ <- Stream.eval(create.allTables.transact(xa))
-      initialUserStore = UserStore(xa, conf.hotUsersList)
+
+      userRepo = new DoobieUserRepo[IO](xa)
+      userService = new User.Service[IO](userRepo, new User.FromRepoValidation[IO](userRepo))
+
+      companyRepo = new DoobieCompanyRepo[IO](xa)
+      companyService = new Company.Service[IO](companyRepo, new Company.FromRepoValidation[IO](companyRepo), userService)
+
+      initialUserStore = UserStore(userService, conf.hotUsersList)
       tokenStore <- Stream.eval(TokenStore.empty)
+
+      auth = BearerTokenAuthenticator(
+        tokenStore,
+        initialUserStore.identityStore,
+        TSecTokenSettings(
+          expiryDuration = 10.minutes,
+          maxIdle = None
+        ))
+      routeAuth = SecuredRequestHandler(auth)
+      authorizationInfo = Authentication.authRole[IO](userService, companyService)
+
+      companyEndpoints = new CompanyEndpoints[IO]().endpoints(companyService, routeAuth)(authorizationInfo)
+      userEndpoints = new UserEndpoints[IO]().endpoints(userService, initialUserStore, routeAuth)(authorizationInfo)
+
       exitCode <- BlazeServerBuilder[IO](global)
         .bindHttp(conf.port, conf.host)
         .withHttpApp(Logger.httpApp[IO](true, true)(
-          createHttpApp(initialUserStore, tokenStore, client, xa)
+          Router(
+            "/" -> (userEndpoints <+> Routes.uiRoutes),
+            "/company" -> companyEndpoints
+          ).orNotFound
         ))
         .serve
     } yield exitCode

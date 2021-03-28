@@ -9,7 +9,7 @@ export type User = {
     email: string,
 };
 
-type SimplifiedFetch = (url: string, body?: string) => Promise<Response | void>;
+type SimplifiedFetch = (url: string, body?: string | number) => Promise<Response | void>;
 
 export type AuthenticatedFetch = {
     get: SimplifiedFetch,
@@ -39,8 +39,8 @@ export const updateAuthenticatedFetchWithResponse = (response: Response, setter:
 
 export const createAuthenticatedFetch = (bearerToken: string, setter: SetterOrUpdater<AuthenticatedFetch | undefined>): AuthenticatedFetch => {
     const customFetch = (method: string) =>
-        (url: string, body?: string) =>
-            fetch(url, { headers: [[AuthHeader, bearerToken]], method, body })
+        (url: string, body?: string | number) =>
+            fetch(url, { headers: [[AuthHeader, bearerToken]], method, body: body as string })
                 .then(response => {
                     if(response.status === 401) setter(undefined);
                     return response;
