@@ -21,5 +21,12 @@ object create {
        rh_user            serial        NOT NULL references users(id)
     )""".update
 
-  val allTables = (users.run, companies.run).mapN(_ + _)
+  val companyContracts =
+    sql"""CREATE TABLE IF NOT EXISTS company_contracts (
+       id                 serial        PRIMARY KEY,
+       company            serial        NOT NULL references companies(id),
+       kind               text          NOT NULL
+    )""".update
+
+  val allTables = (users.run, companies.run, companyContracts.run).mapN(_ + _ + _)
 }
