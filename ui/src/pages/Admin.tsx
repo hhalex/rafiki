@@ -9,7 +9,7 @@ import { TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Fab, 
 import EditIcon from '@material-ui/icons/Edit';
 import DeleteIcon from '@material-ui/icons/Delete';
 import { AuthenticatedFetch } from '../atoms/Auth';
-import { CreateCompany, createCompanyApi, FullCompany, UpdateCompany } from '../api/company';
+import { createCompanyApi, FullCompany } from '../api/company';
 
 
 interface TabPanelProps {

@@ -12,12 +12,19 @@ export type User = {
 
 type SimplifiedFetch = (url: string, body?: string | number) => Promise<Response>;
 
+export enum Role {
+    Admin = "Admin",
+    Company = "Company",
+    Employee = "Employee"
+};
+
 export type AuthenticatedFetch = {
     get: SimplifiedFetch,
     post: SimplifiedFetch,
     delete: SimplifiedFetch,
-    put: SimplifiedFetch
-}
+    put: SimplifiedFetch,
+    role: Role
+};
 
 export const authenticatedFetchAtom = atom<AuthenticatedFetch | undefined>({
     key: "bearerToken",
@@ -26,19 +33,20 @@ export const authenticatedFetchAtom = atom<AuthenticatedFetch | undefined>({
 
 const AuthHeader = "Authorization";
 
-export const updateAuthenticatedFetchWithResponse = (response: Response, setter: SetterOrUpdater<AuthenticatedFetch | undefined>) => {
+export const updateAuthenticatedFetchWithResponse = async (response: Response, setter: SetterOrUpdater<AuthenticatedFetch | undefined>) => {
     const updatedBearerToken = response.status === 401
         ? undefined
         : response.headers.get(AuthHeader) ?? undefined;
+    const role = await response.json() as Role;
     setter(_ => 
         updatedBearerToken 
-            ? createAuthenticatedFetch(updatedBearerToken, setter)
+            ? createAuthenticatedFetch(updatedBearerToken, role, setter)
             : undefined
     );
     return response;
 }
 
-export const createAuthenticatedFetch = (bearerToken: string, setter: SetterOrUpdater<AuthenticatedFetch | undefined>): AuthenticatedFetch => {
+export const createAuthenticatedFetch = (bearerToken: string, role: Role, setter: SetterOrUpdater<AuthenticatedFetch | undefined>): AuthenticatedFetch => {
     const customFetch = (method: string) =>
         (url: string, body?: string | number) =>
             fetch(url, { headers: [[AuthHeader, bearerToken]], method, body: body as string })
@@ -51,7 +59,8 @@ export const createAuthenticatedFetch = (bearerToken: string, setter: SetterOrUp
         get: customFetch("GET"),
         post: customFetch("POST"),
         delete: customFetch("DELETE"),
-        put: customFetch("PUT")
+        put: customFetch("PUT"),
+        role
     };
 };
 
