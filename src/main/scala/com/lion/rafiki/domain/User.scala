@@ -3,6 +3,7 @@ package com.lion.rafiki.domain
 import cats.data.{EitherT, OptionT}
 import cats.{Applicative, Monad}
 import cats.syntax.all._
+import com.lion.rafiki.auth.Role
 import io.circe.{Decoder, Encoder, Json, JsonObject}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.syntax.EncoderOps
@@ -33,7 +34,7 @@ object User {
   implicit val userUpdateDecoder: Decoder[User.Update] = WithId.decoder
   implicit val userFullEncoder: Encoder[User.Full] = WithId.encoder
 
-  case class Authed(id: Id, username: String, password: PasswordHash[BCrypt])
+  case class Authed(id: Id, username: String, password: PasswordHash[BCrypt], role: Role)
 
   type CreateRecord = User[PasswordHash[BCrypt]]
   type Record = WithId[Id, CreateRecord]

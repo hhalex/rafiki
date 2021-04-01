@@ -28,7 +28,7 @@ class UserEndpoints[F[_]: Sync] extends Http4sDsl[F] {
           user <- req.as[UsernamePasswordCredentials]
           userOpt <- checkPassword(user)
         } yield userOpt).flatMap {
-          case Some(user) => auth.create(user.id).map(auth.embed(Response[F](Status.Ok), _))
+          case Some(user) => auth.create(user.id).map(auth.embed(Response[F](Status.Ok).withEntity(user.role), _))
           case None => Response[F](Status.Unauthorized).pure[F]
         }
     }

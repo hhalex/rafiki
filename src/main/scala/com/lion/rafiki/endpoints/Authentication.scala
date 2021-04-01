@@ -4,7 +4,7 @@ import cats.implicits.catsSyntaxApplicativeId
 import cats.syntax.all._
 import cats.{Monad, MonadError}
 import com.lion.rafiki.auth.Role
-import com.lion.rafiki.domain.{Company, User, ValidationError}
+import com.lion.rafiki.domain.{Company, User}
 import com.lion.rafiki.domain.User.Authed
 import tsec.authentication.TSecAuthService
 import tsec.authorization.{AuthorizationInfo, BasicRBAC}
@@ -22,11 +22,6 @@ object Authentication {
     TSecAuthService.withAuthorization(BasicRBAC[F, Role, User.Authed, Auth](Role.Admin))(pf)
 
   def authRole[F[_]](userService: User.Service[F], companyService: Company.Service[F])(implicit F: Monad[F]): AuthorizationInfo[F, Role, Authed] =
-    (u: User.Authed) => userService.getById(u.id).value.flatMap({
-      case Left(ValidationError.UserNotFound) => Role.Admin.pure[F]
-      case _ =>
-        companyService.getFromUser(u.id).map(_ => Role.Company)
-          .valueOr(_ => Role.Employee)
-    })
+    (u: User.Authed) => u.role.pure[F]
 
 }

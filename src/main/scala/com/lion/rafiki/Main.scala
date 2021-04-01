@@ -43,7 +43,7 @@ object Main extends IOApp {
       companyContractRepo = new DoobieCompanyContractRepo[IO](xa)
       companyContractService = new CompanyContract.Service[IO](companyContractRepo, companyValidation)
 
-      initialUserStore = UserStore(userService, conf.hotUsersList)
+      initialUserStore = UserStore(userService, companyService, conf.hotUsersList)
       tokenStore <- Stream.eval(TokenStore.empty)
 
       auth = BearerTokenAuthenticator(
