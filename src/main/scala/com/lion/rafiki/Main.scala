@@ -3,9 +3,9 @@ package com.lion.rafiki
 import cats.effect.{Blocker, ExitCode, IO, IOApp}
 import cats.implicits.toSemigroupKOps
 import com.lion.rafiki.auth.{TokenStore, UserStore}
-import com.lion.rafiki.domain.{Company, User}
+import com.lion.rafiki.domain.{Company, CompanyContract, User}
 import com.lion.rafiki.endpoints.{Authentication, CompanyEndpoints, UserEndpoints}
-import com.lion.rafiki.sql.{DoobieCompanyRepo, DoobieUserRepo, create}
+import com.lion.rafiki.sql.{DoobieCompanyContractRepo, DoobieCompanyRepo, DoobieUserRepo, create}
 import doobie.util.transactor.Transactor
 import doobie.implicits._
 import org.http4s.implicits._
@@ -38,7 +38,10 @@ object Main extends IOApp {
       userService = new User.Service[IO](userRepo, new User.FromRepoValidation[IO](userRepo))
 
       companyRepo = new DoobieCompanyRepo[IO](xa)
-      companyService = new Company.Service[IO](companyRepo, new Company.FromRepoValidation[IO](companyRepo), userService)
+      companyValidation = new Company.FromRepoValidation[IO](companyRepo)
+      companyService = new Company.Service[IO](companyRepo, companyValidation, userService)
+      companyContractRepo = new DoobieCompanyContractRepo[IO](xa)
+      companyContractService = new CompanyContract.Service[IO](companyContractRepo, companyValidation)
 
       initialUserStore = UserStore(userService, conf.hotUsersList)
       tokenStore <- Stream.eval(TokenStore.empty)
@@ -53,7 +56,7 @@ object Main extends IOApp {
       routeAuth = SecuredRequestHandler(auth)
       authorizationInfo = Authentication.authRole[IO](userService, companyService)
 
-      companyEndpoints = new CompanyEndpoints[IO]().endpoints(companyService, routeAuth)(authorizationInfo)
+      companyEndpoints = new CompanyEndpoints[IO]().endpoints(companyService, companyContractService, routeAuth)(authorizationInfo)
       userEndpoints = new UserEndpoints[IO]().endpoints(userService, initialUserStore, routeAuth)(authorizationInfo)
 
       exitCode <- BlazeServerBuilder[IO](global)
@@ -61,7 +64,7 @@ object Main extends IOApp {
         .withHttpApp(Logger.httpApp[IO](true, true)(
           Router(
             "/" -> (userEndpoints <+> Routes.uiRoutes),
-            "/company" -> companyEndpoints
+            "/api" -> companyEndpoints
           ).orNotFound
         ))
         .serve

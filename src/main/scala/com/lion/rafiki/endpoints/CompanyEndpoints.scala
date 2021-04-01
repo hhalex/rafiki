@@ -3,10 +3,11 @@ package com.lion.rafiki.endpoints
 import cats.effect.Sync
 import cats.syntax.all._
 import com.lion.rafiki.auth.Role
-import com.lion.rafiki.domain.{Company, User}
+import com.lion.rafiki.domain.{Company, CompanyContract, User}
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.HttpRoutes
+import org.http4s.server.Router
 import tsec.authentication._
 import tsec.authorization.AuthorizationInfo
 
@@ -14,6 +15,9 @@ class CompanyEndpoints[F[_]: Sync] extends Http4sDsl[F] {
   import Pagination._, CirceEntityDecoder._, CirceEntityEncoder._
 
   object CompanyIdVar extends IdVar[Company.Id](Company.tagSerial)
+  object CompanyContractIdVar extends IdVar[CompanyContract.Id](CompanyContract.tagSerial)
+
+  // Global Company endpoints
 
   private def createCompanyEndpoint(companyService: Company.Service[F]): AuthEndpoint[F] = {
     case req @ POST -> Root asAuthed _ =>
@@ -26,7 +30,6 @@ class CompanyEndpoints[F[_]: Sync] extends Http4sDsl[F] {
         case Right(createdCompanyAndUser) => Ok(createdCompanyAndUser)
         case Left(err) => Conflict(s"Error '$err' while creating company.")
       })
-
   }
 
   private def updateCompanyEndpoint(companyService: Company.Service[F]): AuthEndpoint[F] = {
@@ -71,8 +74,78 @@ class CompanyEndpoints[F[_]: Sync] extends Http4sDsl[F] {
       } yield resp
   }
 
+  // Global company contracts endpoints
+
+  private def createCompanyContractEndpoint(companyContractService: CompanyContract.Service[F]): AuthEndpoint[F] = {
+    case req @ POST -> Root / CompanyIdVar(companyId) / "contract" asAuthed _ =>
+      val action = for {
+        contract <- req.request.as[CompanyContract.CreateRecord]
+        result <- companyContractService.create(contract.copy(company = companyId)).value
+      } yield result
+
+      action.flatMap({
+        case Right(createdCompanyContract) => Ok(createdCompanyContract)
+        case Left(err) => BadRequest(s"Error '$err' while creating company contract '${req.request.as[String]}'.")
+      })
+  }
+
+  private def updateCompanyContractEndpoint(companyContractService: CompanyContract.Service[F]): AuthEndpoint[F] = {
+    case req @ PUT -> Root / CompanyIdVar(companyId) / "contract" / CompanyContractIdVar(contractId) asAuthed _ =>
+      val action = for {
+        companyContract <- req.request.as[CompanyContract.CreateRecord]
+        result <- companyContractService.update(companyContract.copy(company = companyId).withId(contractId)).value
+      } yield result
+
+      action.flatMap {
+        case Right(saved) => Ok(saved)
+        case Left(err) => BadRequest(s"Error '$err' while updating company contract '${req.request.as[String]}'.")
+      }
+  }
+
+  private def getCompanyContractEndpoint(companyContractService: CompanyContract.Service[F]): AuthEndpoint[F] = {
+    case req @ GET -> Root / CompanyIdVar(companyId) / "contract" / CompanyContractIdVar(id) asAuthed _ =>
+      companyContractService.get(id).value.flatMap {
+        case Right(found) if found.data.company == companyId => Ok(found)
+        case Right(_) => BadRequest(s"Error while getting company contract (malformed request).")
+        case Left(err) => BadRequest(s"Error '$err' while getting company contract '${req.request.as[String]}'.")
+      }
+  }
+
+  private def deleteCompanyContractEndpoint(companyContractService: CompanyContract.Service[F]): AuthEndpoint[F] = {
+    case req @ DELETE -> Root / CompanyIdVar(companyId) / "contract" / CompanyContractIdVar(id) asAuthed _ =>
+      companyContractService.get(id).value.flatMap({
+        case Right(companyContract) if companyContract.data.company == companyId => for {
+          _ <- companyContractService.delete(id)
+          resp <- Ok()
+        } yield resp
+        case Right(_) => BadRequest(s"Error while deleting company contract (malformed request).")
+        case Left(err) => BadRequest(s"Error '$err' while deleting company contract '${req.request.as[String]}'.")
+      })
+  }
+
+  private def listCompanyContractsEndpoint(companyContractService: CompanyContract.Service[F]): AuthEndpoint[F] = {
+    case GET -> Root / CompanyIdVar(companyId) / "contract" :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(
+    offset,
+    ) asAuthed _ =>
+      for {
+        retrieved <- companyContractService.listByCompany(companyId, pageSize.getOrElse(10), offset.getOrElse(0))
+        resp <- Ok(retrieved)
+      } yield resp
+  }
+
+  private def listAllCompanyContractsEndpoint(companyContractService: CompanyContract.Service[F]): AuthEndpoint[F] = {
+    case GET -> Root / "contract":? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(
+    offset,
+    ) asAuthed _ =>
+      for {
+        retrieved <- companyContractService.list(pageSize.getOrElse(10), offset.getOrElse(0))
+        resp <- Ok(retrieved)
+      } yield resp
+  }
+
   def endpoints(
                  companyService: Company.Service[F],
+                 companyContractService: CompanyContract.Service[F],
                  auth: SecuredRequestHandler[F, User.Id, User.Authed, Auth],
                )(implicit A: AuthorizationInfo[F, Role, User.Authed]): HttpRoutes[F] = {
 
@@ -84,6 +157,17 @@ class CompanyEndpoints[F[_]: Sync] extends Http4sDsl[F] {
           .orElse(listCompaniesEndpoint(companyService))
       )
 
-    auth.liftService(authEndpoints)
+    val authCompanyContractEndpoints: AuthService[F] = Authentication.adminOnly(
+      createCompanyContractEndpoint(companyContractService)
+        .orElse(getCompanyContractEndpoint(companyContractService))
+        .orElse(deleteCompanyContractEndpoint(companyContractService))
+        .orElse(updateCompanyContractEndpoint(companyContractService))
+        .orElse(listCompanyContractsEndpoint(companyContractService))
+        .orElse(listAllCompanyContractsEndpoint(companyContractService))
+    )
+
+    Router(
+      "/company" -> auth.liftService(authEndpoints <+> authCompanyContractEndpoints)
+    )
   }
 }

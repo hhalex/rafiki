@@ -9,6 +9,7 @@ import { TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Fab, 
 import EditIcon from '@material-ui/icons/Edit';
 import DeleteIcon from '@material-ui/icons/Delete';
 import { AuthenticatedFetch } from '../atoms/Auth';
+import { CreateCompany, createCompanyApi, FullCompany, UpdateCompany } from '../api/company';
 
 
 interface TabPanelProps {
@@ -142,36 +143,26 @@ const useStylesCRUD = makeStyles({
 const CompanyCRUD = ({authFetch}: {authFetch: AuthenticatedFetch}) => {
   const classes = useStylesCRUD();
 
+  const api = createCompanyApi(authFetch);
+
   type CompanyFormData = {
-    id?: number,
+    id?: string,
     name?: string,
-    rh_user_id?: number
     rh_user_email?: string,
     rh_user_password?: string,
   };
 
-  type CompanyANDUser = {
-    id: number,
-    name: string,
-    rh_user: {
-      id: number,
-      username: string
-    }
-  };
-
-  const [companiesList, setCompaniesList] = React.useState<CompanyANDUser[]>([]);
-
+  const [companiesList, setCompaniesList] = React.useState<FullCompany[]>([]);
   const [companyFormData, setCompanyFormData] = React.useState<CompanyFormData | undefined>(undefined);
 
-  const handleOpenAddCompanyForm = () => {
+  const initAddCompanyForm = () => {
     setCompanyFormData({});
   }
 
-  const createHandleOpenEditCompanyForm = (c: CompanyANDUser) => () => {
+  const initEditCompanyForm = (c: FullCompany) => {
     setCompanyFormData({
       id: c.id,
       name: c.name,
-      rh_user_id: c.rh_user.id,
       rh_user_email: c.rh_user.username,
       rh_user_password: ""
     });
@@ -181,33 +172,41 @@ const CompanyCRUD = ({authFetch}: {authFetch: AuthenticatedFetch}) => {
     setCompanyFormData(undefined);
   };
 
-  const loadCompanies = () => authFetch.get("/company")
-    .then(b => b && b.json().then(setCompaniesList))
-    .catch(() => {});
+  const loadCompanies = () => api.list().then(setCompaniesList);
 
   const editOrAddCompany = (c: CompanyFormData) => {
-    const add = !c.id;
-    const data = {
-      id: c.id,
-      name: c.name,
-      rh_user: {
-        id: c.rh_user_id,
-        username: c.rh_user_email,
-        password: c.rh_user_password
+    const emptyPromise = new Promise<void>(_ => {});
+    
+    if (c.name && c.rh_user_email && c.rh_user_password !== undefined) {
+
+      const data = {
+        name: c.name,
+        rh_user: {
+          username: c.rh_user_email,
+          password: c.rh_user_password
+        }
+      };
+
+      // No id means we create a new entry
+      if (!c.id) {
+        // Password has to be a non empty string for user creation
+        return c.rh_user_password.length > 0
+          ? api.create(data)
+            .then(loadCompanies)
+            .catch(() => {})
+          : emptyPromise;
       }
-    };
-    const fetchMethod = add 
-      ? authFetch.post("/company", JSON.stringify(data))
-      : authFetch.put(`/company/${c.id}`, JSON.stringify(data));
-    return fetchMethod
-      .then(loadCompanies)
-      .catch(() => {});
+      
+      return api.update({...data, id: c.id})
+        .then(loadCompanies)
+        .catch(() => {});
+    }
+
+    return emptyPromise;
   };
 
-  const createHandleDeleteCompany = (companyId: number) => () => 
-    authFetch.delete(`/company/${companyId}`)
-      .then(loadCompanies)
-      .catch(() => {});
+  const deleteCompany = (companyId: string) =>
+    api.delete(companyId).then(loadCompanies).catch(() => {});
 
   useEffect(loadCompanies as any, []);
 
@@ -233,15 +232,15 @@ const CompanyCRUD = ({authFetch}: {authFetch: AuthenticatedFetch}) => {
               <TableCell>{company.name}</TableCell>
               <TableCell>{company.rh_user.username}</TableCell>
               <TableCell align="right">
-                <EditIcon className={classes.editIcon} onClick={createHandleOpenEditCompanyForm(company)}/>
-                <DeleteIcon className={classes.deleteIcon} onClick={createHandleDeleteCompany(company.id)}/>
+                <EditIcon className={classes.editIcon} onClick={() => initEditCompanyForm(company)}/>
+                <DeleteIcon className={classes.deleteIcon} onClick={() => deleteCompany(company.id)}/>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
     </TableContainer>
-    <Fab className={classes.addIcon} color="primary" aria-label="add" onClick={handleOpenAddCompanyForm} >
+    <Fab className={classes.addIcon} color="primary" aria-label="add" onClick={initAddCompanyForm} >
       <AddIcon/>
     </Fab>
     {companyFormData && <Dialog open={!!companyFormData} onClose={handleClose} aria-labelledby="form-dialog-title">

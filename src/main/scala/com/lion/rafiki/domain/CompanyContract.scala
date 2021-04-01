@@ -27,6 +27,9 @@ object CompanyContract {
     case object Unlimited extends Kind
     case class Unknown(kind: String) extends Kind
 
+    implicit val companyContractKindDecoder: Decoder[Kind] = Decoder[String].emap(Kind.fromStringE)
+    implicit val companyContractKindEncoder: Encoder[Kind] = Encoder[String].contramap(_.toString)
+
     def fromString(s: String) = s.toLowerCase match {
       case "unlimited" => Kind.Unlimited
       case "oneshot" => Kind.OneShot
@@ -43,8 +46,6 @@ object CompanyContract {
 
   implicit val companyContractIdDecoder: Decoder[Id] = Decoder[Long].map(CompanyContract.tagSerial)
   implicit val companyContractIdEncoder: Encoder[Id] = Encoder[Long].contramap(_.asInstanceOf[Long])
-  implicit val companyContractKindDecoder: Decoder[Kind] = Decoder[String].emap(Kind.fromStringE)
-  implicit val companyContractKindEncoder: Encoder[Kind] = Encoder[String].contramap(_.toString)
   implicit val companyContractCreateDecoder: Decoder[CreateRecord] = deriveDecoder
   implicit val companyContractCreateEncoder: Encoder[CreateRecord] = deriveEncoder
   implicit val companyContractWithIdDecoder: Decoder[Record] = WithId.decoder
@@ -59,7 +60,7 @@ object CompanyContract {
     def get(id: Id): OptionT[F, Record]
     def delete(id: Id): OptionT[F, Record]
     def list(pageSize: Int, offset: Int): F[List[Record]]
-    def getByCompany(companyId: Company.Id): F[List[Record]]
+    def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): F[List[Record]]
   }
 
   class Service[F[_]: Monad](companyContractRepo: Repo[F], companyValidation: Company.Validation[F])(implicit P: PasswordHasher[F, BCrypt]) {
@@ -81,6 +82,8 @@ object CompanyContract {
     def delete(id: Id): F[Unit] = companyContractRepo.delete(id).value.as(())
 
     def list(pageSize: Int, offset: Int): F[List[Record]] = companyContractRepo.list(pageSize, offset)
+
+    def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): F[List[Record]] = companyContractRepo.listByCompany(companyId, pageSize, offset)
   }
 }
 

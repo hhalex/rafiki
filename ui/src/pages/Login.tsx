@@ -10,6 +10,7 @@ import LockOutlinedIcon from '@material-ui/icons/LockOutlined';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/core/styles';
 import Container from '@material-ui/core/Container';
+import { Credentials } from '../api/login';
 
 const Copyright = () => 
     <Typography variant="body2" color="textSecondary" align="center">
@@ -38,15 +39,15 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-export const Login = ({updateAuthFetchWithResponse}: {updateAuthFetchWithResponse: (r: Response) => Response}) => {
+export const Login = ({api}: {api: (creds: Credentials) => Promise<Response>}) => {
   const classes = useStyles();
 
-  const [credentials, setCredentials] = React.useState({ username: "", password: "" });
+  const [credentials, setCredentials] = React.useState<Credentials>({ username: "", password: "" });
 
-  const onSubmit = () => fetch("/login", {
-    method: "POST",
-    body: JSON.stringify(credentials)
-  }).then(updateAuthFetchWithResponse);
+  const onSubmit: React.FormEventHandler = e => {
+    e.preventDefault();
+    return api(credentials);
+  }
 
   return (
     <Container component="main" maxWidth="xs">

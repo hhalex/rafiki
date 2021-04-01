@@ -6,7 +6,7 @@ import cats.effect.Bracket
 import cats.implicits.toFunctorOps
 import com.lion.rafiki.domain.{Company, CompanyContract}
 import com.lion.rafiki.sql.SQLPagination.paginate
-import doobie.{Transactor}
+import doobie.Transactor
 import doobie.implicits.toSqlInterpolator
 import doobie.util.meta.Meta
 
@@ -38,6 +38,9 @@ private[sql] object CompanyContractSQL {
     paginate(pageSize, offset)(
       sql"""SELECT * FROM company_contracts""".query[CompanyContract.Record]
     )
+
+  def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int) =
+    paginate(pageSize, offset)(byCompanyId(companyId))
 }
 
 class DoobieCompanyContractRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
@@ -62,5 +65,5 @@ class DoobieCompanyContractRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transact
   override def list(pageSize: Int, offset: Int): F[List[CompanyContract.Record]] =
     CompanyContractSQL.listAll(pageSize: Int, offset: Int).to[List].transact(xa)
 
-  override def getByCompany(id: Company.Id): F[List[CompanyContract.Record]] = CompanyContractSQL.byCompanyId(id).to[List].transact(xa)
+  override def listByCompany(id: Company.Id, pageSize: Int, offset: Int): F[List[CompanyContract.Record]] = CompanyContractSQL.byCompanyId(id).to[List].transact(xa)
 }

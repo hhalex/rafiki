@@ -1,6 +1,7 @@
 import { Dialog, DialogContent } from "@material-ui/core";
 import * as React from "react";
 import { atom, SetterOrUpdater, useRecoilState } from "recoil";
+import { createLoginApi } from "../api/login";
 import { Login } from "../pages/Login";
 
 export type User = {
@@ -9,7 +10,7 @@ export type User = {
     email: string,
 };
 
-type SimplifiedFetch = (url: string, body?: string | number) => Promise<Response | void>;
+type SimplifiedFetch = (url: string, body?: string | number) => Promise<Response>;
 
 export type AuthenticatedFetch = {
     get: SimplifiedFetch,
@@ -44,7 +45,7 @@ export const createAuthenticatedFetch = (bearerToken: string, setter: SetterOrUp
                 .then(response => {
                     if(response.status === 401) setter(undefined);
                     return response;
-                }).catch(console.log);
+                });
 
     return {
         get: customFetch("GET"),
@@ -57,6 +58,7 @@ export const createAuthenticatedFetch = (bearerToken: string, setter: SetterOrUp
 export const AuthProvider = ({ children }: any) => {
 
     const [authFetch, setAuthFetch] = useRecoilState(authenticatedFetchAtom);
+    const loginApi = createLoginApi(r => updateAuthenticatedFetchWithResponse(r, setAuthFetch));
   
     return authFetch
       ? React.isValidElement<{authFetch: AuthenticatedFetch}>(children)
@@ -64,7 +66,7 @@ export const AuthProvider = ({ children }: any) => {
         : React.createElement(children, {authFetch})
       : <Dialog open={true} aria-labelledby="form-dialog-title">
           <DialogContent>
-              <Login updateAuthFetchWithResponse={r => updateAuthenticatedFetchWithResponse(r, setAuthFetch)} />
+              <Login api={loginApi} />
           </DialogContent>
       </Dialog>;
 };
