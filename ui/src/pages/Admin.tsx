@@ -9,7 +9,7 @@ import { TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Fab, 
 import EditIcon from '@material-ui/icons/Edit';
 import DeleteIcon from '@material-ui/icons/Delete';
 import { AuthenticatedFetch } from '../atoms/Auth';
-import { createCompanyApi, FullCompany } from '../api/company';
+import { Company } from '../api/company';
 
 
 interface TabPanelProps {
@@ -143,7 +143,7 @@ const useStylesCRUD = makeStyles({
 const CompanyCRUD = ({authFetch}: {authFetch: AuthenticatedFetch}) => {
   const classes = useStylesCRUD();
 
-  const api = createCompanyApi(authFetch);
+  const api = Company.createApi(authFetch);
 
   type CompanyFormData = {
     id?: string,
@@ -152,14 +152,14 @@ const CompanyCRUD = ({authFetch}: {authFetch: AuthenticatedFetch}) => {
     rh_user_password?: string,
   };
 
-  const [companiesList, setCompaniesList] = React.useState<FullCompany[]>([]);
+  const [companiesList, setCompaniesList] = React.useState<Company.Full[]>([]);
   const [companyFormData, setCompanyFormData] = React.useState<CompanyFormData | undefined>(undefined);
 
   const initAddCompanyForm = () => {
     setCompanyFormData({});
   }
 
-  const initEditCompanyForm = (c: FullCompany) => {
+  const initEditCompanyForm = (c: Company.Full) => {
     setCompanyFormData({
       id: c.id,
       name: c.name,

@@ -6,7 +6,7 @@ export type CompanyContract<Company> = {
     kind: CompanyContract.Kind
 };
 
-export module CompanyContract {
+export namespace CompanyContract {
     export const enum Kind {
         Unlimited = "unlimited",
         OneShot = "oneshot"

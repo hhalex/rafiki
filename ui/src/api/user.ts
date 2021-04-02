@@ -1,10 +1,12 @@
 import { WithId } from "./WithId";
 
-export type CreateUser = {
-    username: string,
-    password: string,
-    firstname?: string,
-    name?: string
-};
+export namespace User {
+    export type Create = {
+        username: string,
+        password: string,
+        firstname?: string,
+        name?: string
+    };
 
-export type UpdateUser = WithId<CreateUser>;
+    export type Update = WithId<Create>;
+}
