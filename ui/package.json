@@ -3,21 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@material-ui/core": "^4.11.1",
-    "@material-ui/icons": "^4.9.1",
+    "@material-ui/core": "^4.11.3",
+    "@material-ui/icons": "^4.11.2",
     "@testing-library/jest-dom": "^5.11.4",
-    "@testing-library/react": "^11.1.0",
+    "@testing-library/react": "^11.2.6",
     "@testing-library/user-event": "^12.1.10",
-    "react": "^17.0.1",
-    "react-dom": "^17.0.1",
-    "react-scripts": "4.0.0",
-    "recoil": "^0.1.2"
+    "react": "17.0.2",
+    "react-dom": "17.0.2",
+    "recoil": "0.2.0"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "start": "webpack serve --port 9000 --mode development --open --hot",
+    "build": "webpack --mode production"
   },
   "eslintConfig": {
     "extends": [
@@ -26,9 +23,18 @@
     ]
   },
   "devDependencies": {
-    "@types/react": "16.9.56",
-    "@types/react-dom": "16.9.9",
-    "typescript": "4.0.5"
+    "@types/react": "17.0.2",
+    "@types/react-dom": "17.0.2",
+    "awesome-typescript-loader": "^5.2.1",
+    "copy-webpack-plugin": "^8.1.0",
+    "css-loader": "^5.2.0",
+    "html-webpack-plugin": "^5.3.1",
+    "mini-css-extract-plugin": "^1.4.0",
+    "style-loader": "^2.0.0",
+    "typescript": "4.2.3",
+    "webpack": "^5.30.0",
+    "webpack-cli": "^4.6.0",
+    "webpack-dev-server": "^3.11.2"
   },
   "browserslist": {
     "production": [
