@@ -128,7 +128,6 @@ export const AuthProvider = ({ children }: any) => {
 
     // If not authenticated, try using persisted authentication
     useEffect(() => {
-        console.log("use effect try get persisted auth")
         if (!authFetch) {
             const auth = TokenAndRole.get();
             if (auth)
