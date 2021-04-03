@@ -2,48 +2,13 @@ import React, { useEffect } from 'react';
 import { makeStyles, Theme } from '@material-ui/core/styles';
 import Tabs from '@material-ui/core/Tabs';
 import Tab from '@material-ui/core/Tab';
-import Box from '@material-ui/core/Box';
 import AddIcon from '@material-ui/icons/Add';
 import { TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Fab, Button, Dialog, DialogActions, DialogContent, TextField, Typography, DialogTitle } from '@material-ui/core';
-
+import { Link, NavLink, Route, Switch, useLocation, useRouteMatch } from "react-router-dom";
 import EditIcon from '@material-ui/icons/Edit';
 import DeleteIcon from '@material-ui/icons/Delete';
 import { AuthenticatedFetch } from '../atoms/Auth';
 import { Company } from '../api/company';
-
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: any;
-  value: any;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`vertical-tabpanel-${index}`}
-      aria-labelledby={`vertical-tab-${index}`}
-      {...other}
-    >
-      {value === index && (
-        <Box p={3}>
-          {children}
-        </Box>
-      )}
-    </div>
-  );
-}
-
-function a11yProps(index: any) {
-  return {
-    id: `vertical-tab-${index}`,
-    'aria-controls': `vertical-tabpanel-${index}`,
-  };
-}
 
 const useStyles = makeStyles((theme: Theme) => ({
   root: {
@@ -77,14 +42,17 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
+const NavTab = ({to, label}: {to: string, label: string}) => {
+  const { path, url } = useRouteMatch();
+  const { pathname } = useLocation();
+  const selected = `${path}${to}` == pathname;
+  return <Link to={`${url}${to}`} ><Tab label={label} selected={selected} /></Link>
+};
+
+
 export default function AdminView({authFetch}: {authFetch: AuthenticatedFetch}) {
   const classes = useStyles();
-  const [value, setValue] = React.useState(0);
-
-  const handleChange = (_: React.ChangeEvent<{}>, newValue: number) => {
-    setValue(newValue);
-  };
-
+  const { path, url } = useRouteMatch();
   return (
     <div className={classes.root}>
       <div className={classes.header}>
@@ -93,32 +61,33 @@ export default function AdminView({authFetch}: {authFetch: AuthenticatedFetch}) 
       <div className={classes.body}>
         <Tabs
           orientation="vertical"
-          value={value}
-          onChange={handleChange}
           aria-label="Administration"
           className={classes.tabs}
+          value={false}
         >
-          <Tab label="Contrats" {...a11yProps(0)} />
-          <Tab label="Entreprises" {...a11yProps(1)} />
-          <Tab label="Employés" {...a11yProps(2)} />
-          <Tab label="Factures" {...a11yProps(3)} />
+          <NavTab to={`/companies`} label="Entreprises" />
+          <NavTab to={`/employees`} label="Employés" />
+          <NavTab to={`/bills`} label="Factures" />
+          <NavTab to={`/doctors`} label="Médecins" />
         </Tabs>
         <div className={classes.panel}>
-          <TabPanel value={value} index={0}>
-            Contrats
-                  <hr style={{ width: "100%" }} />
-          </TabPanel>
-          <TabPanel value={value} index={1}>
-            <CompanyCRUD authFetch={authFetch} />
-          </TabPanel>
-          <TabPanel value={value} index={2}>
-            Employés
-                  <hr style={{ width: "250px" }} />
-          </TabPanel>
-          <TabPanel value={value} index={3}>
-            Factures
-                  <hr style={{ width: "250px" }} />
-          </TabPanel>
+          <Switch>
+            <Route path={`${path}/companies`}>
+              <CompanyCRUD authFetch={authFetch} />
+            </Route>
+            <Route path={`${path}/employees`}>
+              Employés <hr style={{ width: "250px" }} /> 
+            </Route>
+            <Route path={`${path}/doctors`}>
+              Médecins <hr style={{ width: "250px" }} /> 
+            </Route>
+            <Route path={`${path}/bills`}>
+              Factures <hr style={{ width: "250px" }} /> 
+            </Route>
+            <Route path={path}>
+              Welcome to the admin page
+            </Route>
+          </Switch>
         </div>
       </div>
     </div>

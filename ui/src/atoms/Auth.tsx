@@ -10,6 +10,12 @@ export type User = {
     email: string,
 };
 
+/**
+ * Produces an authenticated http request.
+ * @param {string} url The endpoint to call.
+ * @param {string} [body] The body of the http request.
+ * @returns {Promise<Response>} A promise of the http response.
+ */
 type SimplifiedFetch = (url: string, body?: string | number) => Promise<Response>;
 
 export enum Role {
@@ -65,17 +71,20 @@ export const createAuthenticatedFetch = (bearerToken: string, role: Role, setter
 };
 
 export const AuthProvider = ({ children }: any) => {
-
     const [authFetch, setAuthFetch] = useRecoilState(authenticatedFetchAtom);
-    const loginApi = createLoginApi(r => updateAuthenticatedFetchWithResponse(r, setAuthFetch));
-  
+
+    const LoginModal = () => {
+        const loginApi = createLoginApi(r => updateAuthenticatedFetchWithResponse(r, setAuthFetch));
+        return <Dialog open={true} aria-labelledby="form-dialog-title">
+            <DialogContent>
+                <Login api={loginApi} />
+            </DialogContent>
+        </Dialog>;
+    }
+    
     return authFetch
       ? React.isValidElement<{authFetch: AuthenticatedFetch}>(children)
         ? React.cloneElement(children, {authFetch})
         : React.createElement(children, {authFetch})
-      : <Dialog open={true} aria-labelledby="form-dialog-title">
-          <DialogContent>
-              <Login api={loginApi} />
-          </DialogContent>
-      </Dialog>;
+      : <LoginModal />;
 };

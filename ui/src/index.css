@@ -11,3 +11,15 @@ code {
     font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
         monospace;
 }
+
+a:link {
+  text-decoration: inherit;
+  color: inherit;
+  cursor: auto;
+}
+
+a:visited {
+  text-decoration: inherit;
+  color: inherit;
+  cursor: auto;
+}
