@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter, Redirect, Route, Switch } from "react-router-dom";
 import { AuthenticatedFetch, AuthProvider, Role } from "./atoms/Auth";
 import Admin from "./pages/Admin";
+import Company from "./pages/Company";
 
 
 export const App = () => {
@@ -17,7 +18,7 @@ export const App = () => {
             <Route path="/company">
                 <AuthProvider>{
                     ({authFetch}: {authFetch: AuthenticatedFetch}) => authFetch.role === Role.Company
-                        ? <div>Welcome to you company user!</div>
+                        ? <Company authFetch={authFetch}/>
                         : <Redirect to={`/${authFetch.role.toLowerCase()}`} />
                 }</AuthProvider>
             </Route>
