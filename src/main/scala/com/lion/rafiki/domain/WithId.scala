@@ -3,7 +3,7 @@ package com.lion.rafiki.domain
 import io.circe.{Decoder, Encoder}
 import io.circe.syntax._
 
-final case class WithId[Id, A](id: Id, data: A) {
+final case class WithId[Id, +A](id: Id, data: A) {
   def mapData[B](f: A => B): WithId[Id, B] = WithId[Id, B](id, f(data))
 }
 
