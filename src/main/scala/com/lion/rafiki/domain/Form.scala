@@ -4,52 +4,64 @@ import cats.Monad
 import cats.data.{EitherT, OptionT}
 import cats.implicits._
 import io.circe.{Decoder, Encoder}
-import io.circe.generic.auto._
 import io.circe.syntax.EncoderOps
 import shapeless.tag
 import shapeless.tag.@@
 
+case class Form[T](owner: Option[Company.Id], name: String, description: Option[String], tree: T) {
+  def withId(id: Form.Id) = WithId(id, this)
+}
+
 object Form {
 
+  type Id = Long @@ Form[_]
+  val tagSerial = tag[Form[_]](_: Long)
+
   sealed trait Tree {
-    val id: Option[Form.Id]
+    val id: Option[Tree.Id]
   }
 
-  type Id = Long @@ Tree
-  val tagSerial = tag[Tree](_: Long)
+  object Tree {
+    import io.circe.generic.auto._
 
-  implicit val formIdDecoder: Decoder[Id] = Decoder[Long].map(tagSerial)
-  implicit val formIdEncoder: Encoder[Id] = Encoder[Long].contramap(_.asInstanceOf[Long])
+    type Id = Long @@ Tree
+    val tagSerial = tag[Tree](_: Long)
 
-  case class TextMD(id: Option[Form.Id], text: String) extends Tree
-  case class Question(id: Option[Form.Id], label: String, text: String) extends Tree
-  case class Group(id: Option[Form.Id], children: Seq[Tree]) extends Tree
+    implicit val formTreeIdDecoder: Decoder[Id] = Decoder[Long].map(tagSerial)
+    implicit val formTreeIdEncoder: Encoder[Id] = Encoder[Long].contramap(_.asInstanceOf[Long])
 
-  def createText(text: String): Tree = TextMD(None, text)
-  def createQuestion(label: String, text: String): Tree = Question(None, label, text)
-  def createGroup(children: Tree*): Tree = Group(None, children)
+    case class TextMD(id: Option[Id], text: String) extends Tree
+    case class Question(id: Option[Id], label: String, text: String) extends Tree
+    case class Group(id: Option[Id], children: Seq[Tree]) extends Tree
 
-  def updateText(id: Id, text: String): Tree = TextMD(id.some, text)
-  def updateQuestion(id: Id, label: String, text: String): Tree = Question(id.some, label, text)
-  def updateGroup(id: Id, children: Tree*): Tree = Group(id.some, children)
+    def createText(text: String): Tree = TextMD(None, text)
+    def createQuestion(label: String, text: String): Tree = Question(None, label, text)
+    def createGroup(children: Tree*): Tree = Group(None, children)
 
-  type Create = Tree
-  type Update = Tree
-  type Record = Tree
+    def updateText(id: Id, text: String): Tree = TextMD(id.some, text)
+    def updateQuestion(id: Id, label: String, text: String): Tree = Question(id.some, label, text)
+    def updateGroup(id: Id, children: Tree*): Tree = Group(id.some, children)
 
-  implicit val formDecoder: Decoder[Tree] = List[Decoder[Tree]](
-    Decoder[TextMD].widen,
-    Decoder[Question].widen,
-    Decoder[Group].widen
-  ).reduceLeft(_ or _)
+    type Create = Tree
+    type Update = Tree
+    type Record = Tree
 
-  implicit val formEncoder: Encoder[Tree] = Encoder.instance {
-    case r @ TextMD(_, _) => r.asJson
-    case r @ Question(_, _, _) => r.asJson
-    case r @ Group(_, _) => r.asJson
+    implicit val formTreeDecoder: Decoder[Tree] = List[Decoder[Tree]](
+      Decoder[TextMD].widen,
+      Decoder[Question].widen,
+      Decoder[Group].widen
+    ).reduceLeft(_ or _)
+
+    implicit val formTreeEncoder: Encoder[Tree] = Encoder.instance {
+      case r@TextMD(_, _) => r.asJson
+      case r@Question(_, _, _) => r.asJson
+      case r@Group(_, _) => r.asJson
+    }
   }
-  //implicit val formUpdateDecoder: Decoder[Update] = WithId.decoder
-  //implicit val userFullEncoder: Encoder[Record] = WithId.encoder
+
+  type Create = Form[Tree]
+  type Update = WithId[Id, Form[Tree]]
+  type Record = Update
 
   trait Repo[F[_]] {
     def create(form: Create): F[Record]
@@ -57,6 +69,7 @@ object Form {
     def get(id: Id): OptionT[F, Record]
     def delete(id: Id): OptionT[F, Record]
     def list(pageSize: Int, offset: Int): F[List[Record]]
+    def listByCompany(company: Company.Id, pageSize: Int, offset: Int): F[List[Record]]
   }
 
   trait Validation[F[_]] {
