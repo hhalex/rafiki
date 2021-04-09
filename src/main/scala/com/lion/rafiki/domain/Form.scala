@@ -56,15 +56,15 @@ object Form {
 
     case class Text(id: Option[Id], text: String) extends Tree
     case class Question(id: Option[Id], label: String, text: String) extends Tree
-    case class Group(id: Option[Id], children: Seq[Tree]) extends Tree
+    case class Group(id: Option[Id], children: List[Tree]) extends Tree
 
     def createText(text: String): Tree = Text(None, text)
     def createQuestion(label: String, text: String): Tree = Question(None, label, text)
-    def createGroup(children: Tree*): Tree = Group(None, children)
+    def createGroup(children: Tree*): Tree = Group(None, children.toList)
 
     def updateText(id: Id, text: String): Tree = Text(id.some, text)
     def updateQuestion(id: Id, label: String, text: String): Tree = Question(id.some, label, text)
-    def updateGroup(id: Id, children: Tree*): Tree = Group(id.some, children)
+    def updateGroup(id: Id, children: Tree*): Tree = Group(id.some, children.toList)
 
     type Create = Tree
     type Update = Tree
@@ -90,9 +90,8 @@ object Form {
 
   trait Repo[F[_]] {
     def create(form: Create): F[Record]
-    def createTree(tree: Tree): F[Tree]
     def update(form: Update): OptionT[F, Record]
-    def updateTree(tree: Tree): OptionT[F, Tree]
+    def createOrUpdateTree(tree: Tree, parent: Option[Tree.Key]): F[Tree]
     def get(id: Id): OptionT[F, Record]
     def getWithTree(id: Id): OptionT[F, Full]
     def getTree(id: Tree.Key): OptionT[F, Tree]

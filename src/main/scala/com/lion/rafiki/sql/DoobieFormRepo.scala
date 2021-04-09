@@ -66,6 +66,27 @@ private[sql] object FormSQL {
       .update
   }
 
+  def insertTreeHeaderQ(kind: Form.Tree.Kind, parent: Option[Form.Tree.Key]) = {
+    val (parent_id, parent_kind) = parent.unzip
+    sql"INSERT INTO form_trees (kind, parent_id, parent_kind) VALUES($kind,$parent_id,$parent_kind)"
+      .update
+  }
+
+  def insertTreeQuestionQ(id: Form.Tree.Id, label: String, text: String) = {
+    fr"INSERT INTO form_tree_questions(id,label,text) VALUES($id,$label,$text)"
+      .update
+  }
+
+  def insertTreeTextQ(id: Form.Tree.Id, text: String) = {
+    fr"INSERT INTO form_tree_texts(id,text) VALUES($id,$text)"
+      .update
+  }
+
+  def insertTreeGroupQ(id: Form.Tree.Id) = {
+    fr"INSERT INTO form_tree_groups(id) VALUES($id)"
+      .update
+  }
+
   def updateQ(id: Form.Id, company: Option[Company.Id], name: String, description: Option[String], tree: Option[Form.Tree.Key]) = {
     val (tree_id, tree_kind) = tree.unzip
     val set = fr"company=$company, name=$name, description=$description, tree_id=$tree_id, tree_kind=$tree_kind"
@@ -78,14 +99,35 @@ private[sql] object FormSQL {
       .update
   }
 
+  def updateTreeHeaderQ(key: Form.Tree.Key, parent: Option[Form.Tree.Key]) = {
+    val (parent_id, parent_kind) = parent.unzip
+    sql"UPDATE form_trees SET parent_id=$parent_id, parent_kind=$parent_kind WHERE id=${key._1} AND kind=${key._2}"
+      .update
+  }
+
+  def updateTreeQuestionQ(id: Form.Tree.Id, label: String, text: String) = {
+    sql"UPDATE form_tree_questions SET label=$label, text=$text WHERE id=$id"
+      .update
+  }
+
+  def updateTreeTextQ(id: Form.Tree.Id, text: String) = {
+    sql"UPDATE form_tree_texts SET text=$text WHERE id=$id"
+      .update
+  }
+
+  def updateTreeGroupQ(id: Form.Tree.Id) = {
+    sql"UPDATE form_tree_groups SET 1=1 WHERE id=$id"
+      .update
+  }
+
   def deleteQ(id: Form.Id) =
-    sql"""DELETE FROM forms WHERE id=$id"""
+    sql"DELETE FROM forms WHERE id=$id"
       .update
 
 
   def listAllQ(pageSize: Int, offset: Int) =
     paginate(pageSize, offset)(
-      sql"""SELECT * FROM forms""".query[Form.Record]
+      sql"SELECT * FROM forms".query[Form.Record]
     )
 }
 
@@ -136,17 +178,85 @@ class DoobieFormRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
     }
   }.transact(xa)
 
-
   override def list(pageSize: Int, offset: Int): F[List[Form.Record]] =
     listAllQ(pageSize: Int, offset: Int).to[List].transact(xa)
 
-  override def createTree(tree: Form.Tree): F[Form.Tree] = ???
+  def updateGroup(id: Form.Tree.Id, parent: Option[Form.Tree.Key]): F[Form.Tree.Key] = {
+    val currentKey = (id, Form.Tree.Kind.Group)
+    val updateHead = updateTreeHeaderQ(currentKey, parent).run
+    val updateDetails = updateTreeGroupQ(id).run
+    (updateHead *> updateDetails).transact(xa).as(currentKey)
+  }
 
-  override def updateTree(tree: Form.Tree): OptionT[F, Form.Tree] = ???
+  def insertGroup(parent: Option[Form.Tree.Key]): F[Form.Tree.Key] = {
+    insertTreeHeaderQ(Form.Tree.Kind.Group, parent)
+      .withUniqueGeneratedKeys[Form.Tree.Id]("id")
+      .flatMap(id => insertTreeGroupQ(id).run.as(id))
+      .transact(xa)
+      .map((_, Form.Tree.Kind.Group))
+  }
+
+  def insertText(text: String, parent: Option[Form.Tree.Key]): F[Form.Tree.Key] = {
+    insertTreeHeaderQ(Form.Tree.Kind.Text, parent)
+      .withUniqueGeneratedKeys[Form.Tree.Id]("id")
+      .flatMap(id => insertTreeTextQ(id, text).run.as(id))
+      .transact(xa)
+      .map((_, Form.Tree.Kind.Text))
+  }
+
+  def updateText(id: Form.Tree.Id, text: String, parent: Option[Form.Tree.Key]): F[Form.Tree.Key] = {
+    val currentKey = (id, Form.Tree.Kind.Text)
+    val updateHead = updateTreeHeaderQ(currentKey, parent).run
+    val updateDetails = updateTreeTextQ(id, text).run
+    (updateHead *> updateDetails).transact(xa).as(currentKey)
+  }
+
+  def insertQuestion(label: String, text: String, parent: Option[Form.Tree.Key]): F[Form.Tree.Key] = {
+    insertTreeHeaderQ(Form.Tree.Kind.Question, parent)
+      .withUniqueGeneratedKeys[Form.Tree.Id]("id")
+      .flatMap(id => insertTreeQuestionQ(id, label, text).run.as(id))
+      .transact(xa)
+      .map((_, Form.Tree.Kind.Question))
+  }
+
+  def updateQuestion(id: Form.Tree.Id, label: String, text: String, parent: Option[Form.Tree.Key]): F[Form.Tree.Key] = {
+    val currentKey = (id, Form.Tree.Kind.Question)
+    val updateHead = updateTreeHeaderQ(currentKey, parent).run
+    val updateDetails = updateTreeQuestionQ(id, label, text).run
+    (updateHead *> updateDetails).transact(xa).as(currentKey)
+  }
+
+  override def createOrUpdateTree(tree: Form.Tree, parent: Option[Form.Tree.Key]): F[Form.Tree] = {
+    tree match {
+      case g @ Form.Tree.Group(Some(id), children) =>
+        updateGroup(id, parent).flatMap(key => {
+          children
+            .traverse(c => createOrUpdateTree(c, Some(key)))
+        }).as(g)
+      case g @ Form.Tree.Group(None, children) =>
+        insertGroup(parent).flatMap { key =>
+          children
+            .traverse(createOrUpdateTree(_, Some(key)))
+            .as(g.copy(id = key._1.some))
+        }
+      case t @ Form.Tree.Text(Some(id), text) =>
+        updateText(id, text, parent).as(t)
+      case t @ Form.Tree.Text(None, text) =>
+        insertText(text, parent).map(key => t.copy(id = key._1.some))
+      case q @ Form.Tree.Question(Some(id), label, text) =>
+        updateQuestion(id, label, text, parent).as(q)
+      case q @ Form.Tree.Question(None, label, text) =>
+        insertQuestion(label, text, parent).map(key => q.copy(id = key._1.some))
+    }
+  }
 
   override def getTree(key: Form.Tree.Key): OptionT[F, Form.Tree] = ???
 
-  override def deleteTree(key: Form.Tree.Key): OptionT[F, Form.Tree] = ???
+  override def deleteTree(key: Form.Tree.Key): OptionT[F, Form.Tree.Record] = {
+    OptionT(getTreeNodeByIdQ(key).option)
+      .semiflatMap(node => deleteTreeQ(key).run.as(node))
+      .transact(xa)
+  }
 
   override def listByCompany(company: Company.Id, pageSize: Int, offset: Int): F[List[Record]] = ???
 }
