@@ -95,6 +95,7 @@ private[sql] object FormSQL {
   }
 
   def deleteTreeQ(key: Form.Tree.Key) = {
+    // On CASCADE DELETE will remove all child elements automatically
     sql"""DELETE FROM form_trees WHERE id=${key._1} AND kind=${key._2}"""
       .update
   }
