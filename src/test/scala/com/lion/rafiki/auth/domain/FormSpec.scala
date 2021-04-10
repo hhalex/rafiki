@@ -13,11 +13,11 @@ class FormCodecSpec extends Specification { def is = s2"""
         Text correctly encoded: $correctlyEncodedText
         Text update correctly encoded: $correctlyEncodedTextUpdate"""
 
-  val correctlyEncodedGroup = Form.Tree.Group(Nil).asInstanceOf[Form.Tree].asJson.noSpaces should beEqualTo("""{"id":null,"children":[]}""")
+  val correctlyEncodedGroup = Form.Tree.Group(Nil).asInstanceOf[Form.Tree].asJson.noSpaces should beEqualTo("""{"children":[]}""")
   val correctlyEncodedQuestion = Form.Tree.Question("label", "text").asInstanceOf[Form.Tree].asJson.noSpaces should beEqualTo(
-    """{"id":null,"label":"label","text":"text"}"""
+    """{"label":"label","text":"text"}"""
   )
-  val correctlyEncodedText = Form.Tree.Text("text").asInstanceOf[Form.Tree].asJson.noSpaces should beEqualTo("""{"id":null,"text":"text"}""")
+  val correctlyEncodedText = Form.Tree.Text("text").asInstanceOf[Form.Tree].asJson.noSpaces should beEqualTo("""{"text":"text"}""")
 
   val correctlyEncodedGroupUpdate = Form.Tree.GroupWithKey(Form.Tree.tagSerial(2), Nil).asInstanceOf[Form.Tree].asJson.noSpaces should beEqualTo("""{"id":2,"children":[]}""")
   val correctlyEncodedQuestionUpdate = Form.Tree.QuestionWithKey(Form.Tree.tagSerial(3), "label", "text").asInstanceOf[Form.Tree].asJson.noSpaces should beEqualTo(
