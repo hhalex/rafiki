@@ -23,7 +23,7 @@ private[sql] object FormSQL {
   implicit val formRecordReader: Read[Form.Record] = Read[(Form.Id, Option[Company.Id], String, Option[String], Option[Form.Tree.Id], Option[Form.Tree.Kind])]
     .map({ case (id, company, name, description, tree_id, tree_kind) =>
         Form(company, name, description, tree_id.zip(tree_kind)).withId(id) })
-  implicit val formTreeGroupReader: Read[Form.Tree.Group] = Read[Form.Tree.Id].map(id => Form.Tree.Group(id.some, Nil))
+  implicit val formTreeGroupReader: Read[Form.Tree.GroupWithKey] = Read[Form.Tree.Id].map(id => Form.Tree.GroupWithKey(id, Nil))
 
   def byIdQ(id: Form.Id) =
     sql"""SELECT * FROM forms WHERE id=$id""".query[Form.Record]
@@ -35,21 +35,21 @@ private[sql] object FormSQL {
            LEFT JOIN form_tree_questions ftq
              ON ft.id = ftq.id AND ft.kind AND ftq.kind
            WHERE id=${key._1}
-      """.query[Form.Tree.Question].widen
+      """.query[Form.Tree.QuestionWithKey].widen
     case Form.Tree.Kind.Text =>
       sql"""
          SELECT ft.id, ftt.text FROM form_trees ft
            LEFT JOIN form_tree_texts ftt
              ON ft.id = ftt.id AND ft.kind AND ftt.kind
            WHERE id=${key._1}
-      """.query[Form.Tree.Text].widen
+      """.query[Form.Tree.TextWithKey].widen
     case Form.Tree.Kind.Group =>
       sql"""
          SELECT ft.id FROM form_trees ft
            LEFT JOIN form_tree_groups ftg
              ON ft.id = ftq.id AND ft.kind AND ftq.kind
            WHERE id=${key._1}
-      """.query[Form.Tree.Group].widen
+      """.query[Form.Tree.GroupWithKey].widen
 
     case Form.Tree.Kind.Unknown(s) => throw new Exception(s"Unknow form tree kind $s")
   }
@@ -181,72 +181,64 @@ class DoobieFormRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
   override def list(pageSize: Int, offset: Int): F[List[Form.Record]] =
     listAllQ(pageSize: Int, offset: Int).to[List].transact(xa)
 
-  def updateGroup(id: Form.Tree.Id, parent: Option[Form.Tree.Key]): F[Form.Tree.Key] = {
-    val currentKey = (id, Form.Tree.Kind.Group)
-    val updateHead = updateTreeHeaderQ(currentKey, parent).run
-    val updateDetails = updateTreeGroupQ(id).run
-    (updateHead *> updateDetails).transact(xa).as(currentKey)
+  def updateGroup(g: Form.Tree.GroupWithKey, parent: Option[Form.Tree.Key]): F[Form.Tree.GroupWithKey] = {
+    val updateHead = updateTreeHeaderQ(g.key, parent).run
+    val updateDetails = updateTreeGroupQ(g.id).run
+    (updateHead *> updateDetails).transact(xa).as(g)
   }
 
-  def insertGroup(parent: Option[Form.Tree.Key]): F[Form.Tree.Key] = {
-    insertTreeHeaderQ(Form.Tree.Kind.Group, parent)
+  def insertGroup(g: Form.Tree.Group, parent: Option[Form.Tree.Key]): F[Form.Tree.GroupWithKey] = {
+    insertTreeHeaderQ(g.kind, parent)
       .withUniqueGeneratedKeys[Form.Tree.Id]("id")
-      .flatMap(id => insertTreeGroupQ(id).run.as(id))
+      .flatMap(id => insertTreeGroupQ(id).run.as(g.withKey(id)))
       .transact(xa)
-      .map((_, Form.Tree.Kind.Group))
   }
 
-  def insertText(text: String, parent: Option[Form.Tree.Key]): F[Form.Tree.Key] = {
+  def insertText(t: Form.Tree.Text, parent: Option[Form.Tree.Key]): F[Form.Tree.TextWithKey] = {
     insertTreeHeaderQ(Form.Tree.Kind.Text, parent)
       .withUniqueGeneratedKeys[Form.Tree.Id]("id")
-      .flatMap(id => insertTreeTextQ(id, text).run.as(id))
+      .flatMap(id => insertTreeTextQ(id, t.text).run.as(t.withKey(id)))
       .transact(xa)
-      .map((_, Form.Tree.Kind.Text))
   }
 
-  def updateText(id: Form.Tree.Id, text: String, parent: Option[Form.Tree.Key]): F[Form.Tree.Key] = {
-    val currentKey = (id, Form.Tree.Kind.Text)
-    val updateHead = updateTreeHeaderQ(currentKey, parent).run
-    val updateDetails = updateTreeTextQ(id, text).run
-    (updateHead *> updateDetails).transact(xa).as(currentKey)
+  def updateText(t: Form.Tree.TextWithKey, parent: Option[Form.Tree.Key]): F[Form.Tree.TextWithKey] = {
+    val updateHead = updateTreeHeaderQ(t.key, parent).run
+    val updateDetails = updateTreeTextQ(t.id, t.text).run
+    (updateHead *> updateDetails).transact(xa).as(t)
   }
 
-  def insertQuestion(label: String, text: String, parent: Option[Form.Tree.Key]): F[Form.Tree.Key] = {
-    insertTreeHeaderQ(Form.Tree.Kind.Question, parent)
+  def insertQuestion(q: Form.Tree.Question, parent: Option[Form.Tree.Key]): F[Form.Tree.QuestionWithKey] = {
+    insertTreeHeaderQ(q.kind, parent)
       .withUniqueGeneratedKeys[Form.Tree.Id]("id")
-      .flatMap(id => insertTreeQuestionQ(id, label, text).run.as(id))
+      .flatMap(id => insertTreeQuestionQ(id, q.label, q.text).run.as(q.withKey(id)))
       .transact(xa)
-      .map((_, Form.Tree.Kind.Question))
   }
 
-  def updateQuestion(id: Form.Tree.Id, label: String, text: String, parent: Option[Form.Tree.Key]): F[Form.Tree.Key] = {
-    val currentKey = (id, Form.Tree.Kind.Question)
-    val updateHead = updateTreeHeaderQ(currentKey, parent).run
-    val updateDetails = updateTreeQuestionQ(id, label, text).run
-    (updateHead *> updateDetails).transact(xa).as(currentKey)
+  def updateQuestion(q: Form.Tree.QuestionWithKey, parent: Option[Form.Tree.Key]): F[Form.Tree.QuestionWithKey] = {
+    val updateHead = updateTreeHeaderQ(q.key, parent).run
+    val updateDetails = updateTreeQuestionQ(q.id, q.label, q.text).run
+    (updateHead *> updateDetails).transact(xa).as(q)
   }
 
   override def createOrUpdateTree(tree: Form.Tree, parent: Option[Form.Tree.Key]): F[Form.Tree] = {
+    import Form.Tree._
     tree match {
-      case g @ Form.Tree.Group(Some(id), children) =>
-        updateGroup(id, parent).flatMap(key => {
-          children
-            .traverse(c => createOrUpdateTree(c, Some(key)))
-        }).as(g)
-      case g @ Form.Tree.Group(None, children) =>
-        insertGroup(parent).flatMap { key =>
-          children
-            .traverse(createOrUpdateTree(_, Some(key)))
-            .as(g.copy(id = key._1.some))
-        }
-      case t @ Form.Tree.Text(Some(id), text) =>
-        updateText(id, text, parent).as(t)
-      case t @ Form.Tree.Text(None, text) =>
-        insertText(text, parent).map(key => t.copy(id = key._1.some))
-      case q @ Form.Tree.Question(Some(id), label, text) =>
-        updateQuestion(id, label, text, parent).as(q)
-      case q @ Form.Tree.Question(None, label, text) =>
-        insertQuestion(label, text, parent).map(key => q.copy(id = key._1.some))
+      case g: GroupWithKey =>
+        updateGroup(g, parent).flatMap { updatedG =>
+          g.children
+            .traverse(c => createOrUpdateTree(c, updatedG.key.some))
+            .as(updatedG)
+        }.widen
+      case g: Group =>
+        insertGroup(g, parent).flatMap { updatedG =>
+          g.children
+            .traverse(createOrUpdateTree(_, updatedG.key.some))
+            .as(updatedG)
+        }.widen
+      case t: TextWithKey => updateText(t, parent).widen
+      case t: Text => insertText(t, parent).widen
+      case q: QuestionWithKey => updateQuestion(q, parent).widen
+      case q: Question => insertQuestion(q, parent).widen
     }
   }
 

@@ -18,7 +18,16 @@ object Form {
   val tagSerial = tag[Form[_]](_: Long)
 
   sealed trait Tree {
-    val id: Option[Tree.Id]
+    lazy val kind = this match {
+      case _: Tree.Text | _: Tree.TextWithKey => Tree.Kind.Text
+      case _: Tree.Question | _: Tree.QuestionWithKey => Tree.Kind.Question
+      case _: Tree.Group | _: Tree.GroupWithKey => Tree.Kind.Group
+    }
+    def withKey(id: Tree.Id): TreeWithKey
+  }
+  sealed trait TreeWithKey extends Tree {
+    val id: Tree.Id
+    lazy val key = (id, kind)
   }
 
   object Tree {
@@ -37,7 +46,7 @@ object Form {
       def fromString(s: String): Kind = s.toLowerCase match {
         case "question" => Kind.Question
         case "group" => Kind.Group
-        case "text" => Kind.Group
+        case "text" => Kind.Text
         case other => Kind.Unknown(other)
       }
 
@@ -54,32 +63,45 @@ object Form {
     implicit val formTreeIdDecoder: Decoder[Id] = Decoder[Long].map(tagSerial)
     implicit val formTreeIdEncoder: Encoder[Id] = Encoder[Long].contramap(_.asInstanceOf[Long])
 
-    case class Text(id: Option[Id], text: String) extends Tree
-    case class Question(id: Option[Id], label: String, text: String) extends Tree
-    case class Group(id: Option[Id], children: List[Tree]) extends Tree
-
-    def createText(text: String): Tree = Text(None, text)
-    def createQuestion(label: String, text: String): Tree = Question(None, label, text)
-    def createGroup(children: Tree*): Tree = Group(None, children.toList)
-
-    def updateText(id: Id, text: String): Tree = Text(id.some, text)
-    def updateQuestion(id: Id, label: String, text: String): Tree = Question(id.some, label, text)
-    def updateGroup(id: Id, children: Tree*): Tree = Group(id.some, children.toList)
+    case class Text(text: String) extends Tree {
+      override def withKey(id: Id) = TextWithKey(id, text)
+    }
+    case class TextWithKey(id: Id, text: String) extends Tree with TreeWithKey {
+      override def withKey(id: Id) = copy(id = id)
+    }
+    case class Question(label: String, text: String) extends Tree{
+      override def withKey(id: Id) = QuestionWithKey(id, label, text)
+    }
+    case class QuestionWithKey(id: Id, label: String, text: String) extends Tree with TreeWithKey {
+      override def withKey(id: Id) = copy(id = id)
+    }
+    case class Group(children: List[Tree]) extends Tree{
+      override def withKey(id: Id) = GroupWithKey(id, children)
+    }
+    case class GroupWithKey(id: Id, children: List[Tree]) extends Tree with TreeWithKey {
+      override def withKey(id: Id) = copy(id = id)
+    }
 
     type Create = Tree
-    type Update = Tree
-    type Record = Tree
+    type Update = TreeWithKey
+    type Record = TreeWithKey
 
     implicit val formTreeDecoder: Decoder[Tree] = List[Decoder[Tree]](
       Decoder[Text].widen,
+      Decoder[TextWithKey].widen,
       Decoder[Question].widen,
-      Decoder[Group].widen
+      Decoder[QuestionWithKey].widen,
+      Decoder[Group].widen,
+      Decoder[GroupWithKey].widen
     ).reduceLeft(_ or _)
 
     implicit val formTreeEncoder: Encoder[Tree] = Encoder.instance {
-      case r@Text(_, _) => r.asJson
-      case r@Question(_, _, _) => r.asJson
-      case r@Group(_, _) => r.asJson
+      case r: Text => r.asJson
+      case r: TextWithKey => r.asJson
+      case r: Question => r.asJson
+      case r: QuestionWithKey => r.asJson
+      case r: Group => r.asJson
+      case r: GroupWithKey => r.asJson
     }
   }
 
@@ -96,7 +118,7 @@ object Form {
     def getWithTree(id: Id): OptionT[F, Full]
     def getTree(id: Tree.Key): OptionT[F, Tree]
     def delete(id: Id): OptionT[F, Record]
-    def deleteTree(key: Tree.Key): OptionT[F, Tree]
+    def deleteTree(key: Tree.Key): OptionT[F, Tree.Record]
     def list(pageSize: Int, offset: Int): F[List[Record]]
     def listByCompany(company: Company.Id, pageSize: Int, offset: Int): F[List[Record]]
   }
