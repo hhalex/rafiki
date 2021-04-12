@@ -54,7 +54,7 @@ object Main extends IOApp {
           maxIdle = None
         ))
       routeAuth = SecuredRequestHandler(auth)
-      authorizationInfo = Authentication.authRole[IO](userService, companyService)
+      authorizationInfo = Authentication.authRole[IO]()
 
       companyEndpoints = new CompanyEndpoints[IO]().endpoints(companyService, companyContractService, routeAuth)(authorizationInfo)
       userEndpoints = new UserEndpoints[IO]().endpoints(userService, initialUserStore, routeAuth)(authorizationInfo)

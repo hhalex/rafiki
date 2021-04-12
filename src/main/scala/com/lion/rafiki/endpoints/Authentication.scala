@@ -21,7 +21,10 @@ object Authentication {
   def adminOnly[F[_]](pf: AuthEndpoint[F])(implicit F: MonadError[F, Throwable], A: AuthorizationInfo[F, Role, User.Authed]): AuthService[F] =
     TSecAuthService.withAuthorization(BasicRBAC[F, Role, User.Authed, Auth](Role.Admin))(pf)
 
-  def authRole[F[_]](userService: User.Service[F], companyService: Company.Service[F])(implicit F: Monad[F]): AuthorizationInfo[F, Role, Authed] =
+  def companyOnly[F[_]](pf: AuthEndpoint[F])(implicit F: MonadError[F, Throwable], A: AuthorizationInfo[F, Role, User.Authed]): AuthService[F] =
+    TSecAuthService.withAuthorization(BasicRBAC[F, Role, User.Authed, Auth](Role.Company))(pf)
+
+  def authRole[F[_]]()(implicit F: Monad[F]): AuthorizationInfo[F, Role, Authed] =
     (u: User.Authed) => u.role.pure[F]
 
 }

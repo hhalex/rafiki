@@ -8,4 +8,7 @@ object ValidationError {
   case object CompanyContractNotFound extends ValidationError
   case class UserAlreadyExists(data: User.Record) extends ValidationError
   case class CompanyAlreadyExists(data: Company.Record) extends ValidationError
+
+  case object FormNotFound extends ValidationError
+  case object NotAllowed extends ValidationError
 }
