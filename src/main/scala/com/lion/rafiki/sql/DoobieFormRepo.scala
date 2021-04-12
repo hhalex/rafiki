@@ -267,5 +267,5 @@ class DoobieFormRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
   override def deleteTree(key: Form.Tree.Key): F[Unit] =
     deleteTreeQ(key).run.as(()).transact(xa)
 
-  override def listByCompany(company: Company.Id, pageSize: Int, offset: Int): F[List[Record]] = ???
+  override def listByCompany(company: Company.Id, pageSize: Int, offset: Int): F[List[Record]] = byCompanyIdQ(company).to[List].transact(xa)
 }
