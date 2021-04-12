@@ -113,12 +113,11 @@ object Form {
   trait Repo[F[_]] {
     def create(form: Create): F[Record]
     def update(form: Update): OptionT[F, Record]
-    def createOrUpdateTree(tree: Tree, parent: Option[Tree.Key]): F[Tree]
+    def syncTree(tree: Tree, parent: Option[Tree.Key]): F[Tree]
     def get(id: Id): OptionT[F, Record]
     def getWithTree(id: Id): OptionT[F, Full]
-    def getTree(id: Tree.Key): OptionT[F, Tree]
     def delete(id: Id): OptionT[F, Record]
-    def deleteTree(key: Tree.Key): OptionT[F, Tree.Record]
+    def deleteTree(key: Tree.Key): F[Unit]
     def list(pageSize: Int, offset: Int): F[List[Record]]
     def listByCompany(company: Company.Id, pageSize: Int, offset: Int): F[List[Record]]
   }
@@ -129,11 +128,14 @@ object Form {
   }
 
   class Service[F[_] : Monad](repo: Repo[F], validation: Validation[F]) {
+    // forms
     def create(form: Create): EitherT[F, ValidationError, Record] = ???
     def getById(userId: Id): EitherT[F, ValidationError, Record] = ???
     def getByName(userName: String): EitherT[F, ValidationError, Record] = ???
     def delete(userId: Id): F[Unit] = ???
     def update(user: Update): EitherT[F, ValidationError, Record] = ???
     def list(pageSize: Int, offset: Int): F[List[Record]] = ???
+    // trees
+    def syncTree(tree: Tree, parent: Option[Tree.Key] = None): F[Tree] = ???
   }
 }
