@@ -39,8 +39,8 @@ object create {
        tree_kind          form_tree_constr,
        FOREIGN KEY (tree_id, tree_kind)
           REFERENCES form_trees(id, kind)
-          ON DELETE SET NULL
-        CONSTRAINT Company_form_name UNIQUE (company, name)
+          ON DELETE SET NULL,
+       CONSTRAINT Company_form_name UNIQUE (company, name)
     )""".update
 
   val formTrees =
