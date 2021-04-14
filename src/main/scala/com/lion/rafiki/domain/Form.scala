@@ -121,15 +121,16 @@ object Form {
   type Full = WithId[Id, Form[Tree]]
 
   trait Repo[F[_]] {
-    def create(form: Create): F[Record]
-    def update(form: Update): OptionT[F, Record]
-    def syncTree(tree: Tree, parent: Option[Tree.Key]): F[Tree]
-    def get(id: Id): OptionT[F, Record]
-    def getWithTree(id: Id): OptionT[F, Full]
-    def delete(id: Id): OptionT[F, Record]
-    def deleteTree(key: Tree.Key): F[Unit]
-    def list(pageSize: Int, offset: Int): F[List[Record]]
-    def listByCompany(company: Company.Id, pageSize: Int, offset: Int): F[List[Record]]
+    type Result[T] = EitherT[F, RepoError, T]
+    def create(form: Create): Result[Record]
+    def update(form: Update): Result[Record]
+    def syncTree(tree: Tree, parent: Option[Tree.Key]): Result[Tree]
+    def get(id: Id): Result[Record]
+    def getWithTree(id: Id): Result[Full]
+    def delete(id: Id): Result[Record]
+    def deleteTree(key: Tree.Key): Result[Unit]
+    def list(pageSize: Int, offset: Int): Result[List[Record]]
+    def listByCompany(company: Company.Id, pageSize: Int, offset: Int): Result[List[Record]]
   }
 
   trait Validation[F[_]] {
@@ -138,20 +139,21 @@ object Form {
   }
 
   class Service[F[_] : Monad](repo: Repo[F]) {
+    type Result[T] = EitherT[F, ValidationError, T]
     // forms
-    def create(form: Create): EitherT[F, ValidationError, Record] = {
-      EitherT.liftF(repo.create(form))
+    def create(form: Create): Result[Record] = {
+      repo.create(form).leftMap(ValidationError.Repo)
     }
-    def getById(formId: Id): EitherT[F, ValidationError, Record] = {
-      EitherT.fromOptionF(repo.get(formId).value, ValidationError.FormNotFound).leftWiden
+    def getById(formId: Id): Result[Record] = {
+      repo.get(formId).leftMap(ValidationError.Repo)
     }
-    def delete(formId: Id): F[Unit] = {
-      repo.delete(formId).value.as(())
+    def delete(formId: Id): Result[Unit] = {
+      repo.delete(formId).as(()).leftMap(ValidationError.Repo)
     }
-    def update(form: Update): EitherT[F, ValidationError, Record] = {
-      EitherT.fromOptionF(repo.update(form).value, ValidationError.FormNotFound).leftWiden
+    def update(form: Update): Result[Record] = {
+      repo.update(form).leftMap(ValidationError.Repo)
     }
-    def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): F[List[Record]] =
-      repo.listByCompany(companyId, pageSize, offset)
+    def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): Result[List[Record]] =
+      repo.listByCompany(companyId, pageSize, offset).leftMap(ValidationError.Repo)
   }
 }

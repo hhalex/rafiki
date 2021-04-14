@@ -38,9 +38,10 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         form <- EitherT.liftF(req.request.as[Form.Create])
+        formOwner <- formService.getById(id).map(_.data.company)
         result <- {
-          if (form.company.contains(companyUser.id))
-            formService.update(form.withId(id))
+          if (formOwner.contains(companyUser.id))
+            formService.update(form.copy(company = formOwner).withId(id))
           else
             EitherT.leftT[F, Form.Record](ValidationError.NotAllowed: ValidationError)
         }
@@ -79,7 +80,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
         form <- formService.getById(id)
         _ <- {
           if (form.data.company.contains(companyUser.id))
-            EitherT.liftF[F, ValidationError, Unit](formService.delete(form.id))
+            formService.delete(form.id)
           else
             EitherT.leftT[F, Unit](ValidationError.NotAllowed: ValidationError)
         }
@@ -98,9 +99,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     ) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        result <- EitherT.liftF[F, ValidationError, List[Form.Record]](
-          formService.listByCompany(companyUser.id, pageSize.getOrElse(10), offset.getOrElse(0))
-        )
+        result <- formService.listByCompany(companyUser.id, pageSize.getOrElse(10), offset.getOrElse(0))
       } yield result
 
       action.value.flatMap({
