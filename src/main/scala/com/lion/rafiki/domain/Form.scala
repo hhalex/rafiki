@@ -111,9 +111,9 @@ object Form {
   implicit def formDecoder[T: Decoder]: Decoder[Form[T]] = deriveDecoder
   implicit def formEncoder[T: Encoder]: Encoder[Form[T]] = deriveEncoder
   implicit val formCreateDecoder: Decoder[Create] = deriveDecoder
-  implicit val formUpdateDecoder: Decoder[Update] = deriveDecoder
-  implicit val formRecordEncoder: Encoder[Record] = deriveEncoder
-  implicit val formFullEncoder: Encoder[Full] = deriveEncoder
+  implicit val formUpdateDecoder: Decoder[Update] = WithId.decoder
+  implicit val formRecordEncoder: Encoder[Record] = WithId.encoder
+  implicit val formFullEncoder: Encoder[Full] = WithId.encoder
 
   type Create = Form[Tree.Key]
   type Update = WithId[Id, Form[Tree.Key]]
@@ -137,7 +137,7 @@ object Form {
     def exists(c: Id): EitherT[F, ValidationError, Unit]
   }
 
-  class Service[F[_] : Monad](repo: Repo[F], validation: Validation[F]) {
+  class Service[F[_] : Monad](repo: Repo[F]) {
     // forms
     def create(form: Create): EitherT[F, ValidationError, Record] = {
       EitherT.liftF(repo.create(form))

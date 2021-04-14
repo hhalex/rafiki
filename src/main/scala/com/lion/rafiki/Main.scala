@@ -3,9 +3,9 @@ package com.lion.rafiki
 import cats.effect.{Blocker, ExitCode, IO, IOApp}
 import cats.implicits.toSemigroupKOps
 import com.lion.rafiki.auth.{TokenStore, UserStore}
-import com.lion.rafiki.domain.{Company, CompanyContract, User}
-import com.lion.rafiki.endpoints.{Authentication, CompanyEndpoints, UserEndpoints}
-import com.lion.rafiki.sql.{DoobieCompanyContractRepo, DoobieCompanyRepo, DoobieUserRepo, create}
+import com.lion.rafiki.domain.{Company, CompanyContract, Form, User}
+import com.lion.rafiki.endpoints.{Authentication, CompanyBusinessEndpoints, CompanyEndpoints, UserEndpoints}
+import com.lion.rafiki.sql.{DoobieCompanyContractRepo, DoobieCompanyRepo, DoobieFormRepo, DoobieUserRepo, create}
 import doobie.util.transactor.Transactor
 import doobie.implicits._
 import org.http4s.implicits._
@@ -43,6 +43,9 @@ object Main extends IOApp {
       companyContractRepo = new DoobieCompanyContractRepo[IO](xa)
       companyContractService = new CompanyContract.Service[IO](companyContractRepo, companyValidation)
 
+      formRepo = new DoobieFormRepo[IO](xa)
+      formService = new Form.Service[IO](formRepo)
+
       initialUserStore = UserStore(userService, companyService, conf.hotUsersList)
       tokenStore <- Stream.eval(TokenStore.empty)
 
@@ -58,13 +61,17 @@ object Main extends IOApp {
 
       companyEndpoints = new CompanyEndpoints[IO]().endpoints(companyService, companyContractService, routeAuth)(authorizationInfo)
       userEndpoints = new UserEndpoints[IO]().endpoints(userService, initialUserStore, routeAuth)(authorizationInfo)
+      companyBusinessEndpoints = new CompanyBusinessEndpoints[IO]().endpoints(companyService, formService, routeAuth)(authorizationInfo)
 
       exitCode <- BlazeServerBuilder[IO](global)
         .bindHttp(conf.port, conf.host)
         .withHttpApp(Logger.httpApp[IO](true, true)(
           Router(
             "/" -> (userEndpoints <+> Routes.uiRoutes),
-            "/api" -> companyEndpoints
+            "/api" -> Router(
+              "/" -> companyEndpoints,
+              "/company" -> companyBusinessEndpoints
+            )
           ).orNotFound
         ))
         .serve

@@ -1,6 +1,5 @@
 package com.lion.rafiki.sql
 
-import doobie.implicits.toSqlInterpolator
 import cats.implicits._
 import doobie.implicits._
 
@@ -18,13 +17,13 @@ object create {
     sql"""CREATE TABLE IF NOT EXISTS companies (
        id                 serial        PRIMARY KEY,
        name               text          NOT NULL,
-       rh_user            serial        NOT NULL references users(id)
+       rh_user            integer       NOT NULL references users(id)
     )""".update
 
   val companyContracts =
     sql"""CREATE TABLE IF NOT EXISTS company_contracts (
        id                 serial        PRIMARY KEY,
-       company            serial        NOT NULL references companies(id),
+       company            integer       NOT NULL references companies(id),
        kind               text          NOT NULL
     )""".update
 
@@ -32,10 +31,10 @@ object create {
     sql"""
     CREATE TABLE IF NOT EXISTS forms (
        id                 serial        PRIMARY KEY,
-       company            serial        references companies(id),
+       company            integer       references companies(id),
        name               text          NOT NULL,
        description        text,
-       tree_id            serial,
+       tree_id            integer,
        tree_kind          form_tree_constr,
        FOREIGN KEY (tree_id, tree_kind)
           REFERENCES form_trees(id, kind)
@@ -55,7 +54,7 @@ object create {
     CREATE TABLE IF NOT EXISTS form_trees (
        id                 serial        NOT NULL,
        kind               form_tree_constr NOT NULL,
-       parent_id          serial,
+       parent_id          integer,
        parent_kind        form_tree_constr,
        PRIMARY KEY (id, kind),
        FOREIGN KEY (parent_id, parent_kind)

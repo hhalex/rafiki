@@ -4,14 +4,14 @@ import doobie.implicits._
 import cats.implicits._
 import cats.data.OptionT
 import cats.effect.Bracket
-import cats.implicits.{catsSyntaxApplicativeId, toFunctorOps}
-import com.lion.rafiki.domain.Form.{Record, Tree}
-import com.lion.rafiki.domain.Form.Tree.Id
+import cats.implicits.toFunctorOps
+import com.lion.rafiki.domain.Form.Record
 import com.lion.rafiki.domain.{Company, Form}
 import com.lion.rafiki.sql.SQLPagination.paginate
-import doobie.Transactor
+import doobie.{LogHandler, Transactor}
 import doobie.free.connection.ConnectionIO
 import doobie.implicits.toSqlInterpolator
+import doobie.postgres.implicits.pgEnumStringOpt
 import doobie.util.Read
 import doobie.util.meta.Meta
 import doobie.util.query.Query0
@@ -20,11 +20,13 @@ private[sql] object FormSQL {
   import CompanySQL._
   implicit val formIdReader: Meta[Form.Id] = Meta[Long].imap(Form.tagSerial)(_.asInstanceOf[Long])
   implicit val formTreeIdMeta: Meta[Form.Tree.Id] = Meta[Long].imap(Form.Tree.tagSerial)(_.asInstanceOf[Long])
-  implicit val formTreeKindMeta: Meta[Form.Tree.Kind] = Meta[String].imap(Form.Tree.Kind.fromString)(_.toString.toLowerCase)
+  implicit val formTreeKindMeta: Meta[Form.Tree.Kind] = pgEnumStringOpt("form_tree_constr", s => Form.Tree.Kind.fromStringE(s).toOption, _.toString.toLowerCase)
   implicit val formRecordReader: Read[Form.Record] = Read[(Form.Id, Option[Company.Id], String, Option[String], Option[Form.Tree.Id], Option[Form.Tree.Kind])]
     .map({ case (id, company, name, description, tree_id, tree_kind) =>
         Form(company, name, description, tree_id.zip(tree_kind)).withId(id) })
   implicit val formTreeGroupReader: Read[Form.Tree.GroupWithKey] = Read[Form.Tree.Id].map(id => Form.Tree.GroupWithKey(id, Nil))
+
+  implicit val han = LogHandler.jdkLogHandler
 
   def byIdQ(id: Form.Id) =
     sql"""SELECT * FROM forms WHERE id=$id""".query[Form.Record]
