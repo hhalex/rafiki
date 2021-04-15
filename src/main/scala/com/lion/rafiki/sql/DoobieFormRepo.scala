@@ -132,30 +132,29 @@ private[sql] object FormSQL {
 class DoobieFormRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
   extends Form.Repo[F] {
   import FormSQL._
-
-  implicit class ConnectionIOwithErrors[T](c: ConnectionIO[T]) {
-    def toResult(): Result[T] = EitherT(c.attemptSql.transact(xa)).leftMap(RepoError.fromSQLException)
-  }
+  import RepoError.ConnectionIOwithErrors
 
   override def create(form: Form.Create): Result[Form.Record] = insertQ(form.company, form.name, form.description, None)
     .withUniqueGeneratedKeys[Form.Id]("id")
     .map(form.withId _)
     .toResult()
+    .transact(xa)
 
   override def update(form: Form.Record): Result[Form.Record] = {
     updateQ(form.id, form.data.company, form.data.name, form.data.description, form.data.tree).run
       .flatMap(_ => byIdQ(form.id).unique)
       .toResult()
+      .transact(xa)
   }
 
-  override def get(id: Form.Id): Result[Form.Record] = byIdQ(id).unique.toResult()
+  override def get(id: Form.Id): Result[Form.Record] = byIdQ(id).unique.toResult().transact(xa)
 
   override def getWithTree(id: Form.Id): Result[Form.Full] = {
     for {
       form <- byIdQ(id).unique
       tree <- form.data.tree.traverse(getTreeCIO)
     } yield form.mapData(_.copy(tree = tree))
-  }.toResult()
+  }.toResult().transact(xa)
 
   private def getTreeCIO(key: Form.Tree.Key): ConnectionIO[Form.Tree] = {
     val (id, kind) = key
@@ -178,11 +177,11 @@ class DoobieFormRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
         _ <- deleteQ(form.id).run
         _ <- form.data.tree.traverse(t => deleteTreeQ(t).run)
       } yield form
-    }.toResult()
+    }.toResult().transact(xa)
 
 
   override def list(pageSize: Int, offset: Int): Result[List[Form.Record]] =
-    listAllQ(pageSize: Int, offset: Int).to[List].toResult()
+    listAllQ(pageSize: Int, offset: Int).to[List].toResult().transact(xa)
 
   def updateTreeGroupCIO(g: Form.Tree.GroupWithKey, parent: Option[Form.Tree.Key]) =
     for {
@@ -244,7 +243,10 @@ class DoobieFormRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
   def updateTreeQuestion(q: Form.Tree.QuestionWithKey, parent: Option[Form.Tree.Key]): F[Form.Tree.QuestionWithKey] =
     updateTreeQuestionCIO(q, parent).transact(xa)
 
-  override def syncTree(tree: Form.Tree, parent: Option[Form.Tree.Key]): Result[Form.Tree] = syncTreeRec(tree, parent).toResult()
+  override def syncTree(tree: Form.Tree, parent: Option[Form.Tree.Key]): Result[Form.Tree] =
+    syncTreeRec(tree, parent)
+      .toResult()
+      .transact(xa)
 
   private def syncTreeRec(tree: Form.Tree, parent: Option[Form.Tree.Key]): ConnectionIO[Form.Tree] = {
     import Form.Tree._
@@ -269,7 +271,7 @@ class DoobieFormRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
   }
 
   override def deleteTree(key: Form.Tree.Key): Result[Unit] =
-    deleteTreeQ(key).run.as(()).toResult()
+    deleteTreeQ(key).run.as(()).toResult().transact(xa)
 
-  override def listByCompany(company: Company.Id, pageSize: Int, offset: Int): Result[List[Record]] = byCompanyIdQ(company).to[List].toResult()
+  override def listByCompany(company: Company.Id, pageSize: Int, offset: Int): Result[List[Record]] = byCompanyIdQ(company).to[List].toResult().transact(xa)
 }

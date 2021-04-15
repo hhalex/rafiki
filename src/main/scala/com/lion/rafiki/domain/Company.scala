@@ -33,63 +33,48 @@ object Company {
   type Full = WithId[Id, Company[User.CreateRecord]]
 
   trait Repo[F[_]] {
-    def create(c: CreateRecord): F[Record]
-    def update(c: Record): OptionT[F, Record]
-    def get(id: Id): OptionT[F, Record]
-    def getByUser(id: User.Id): OptionT[F, Record]
-    def delete(id: Id): OptionT[F, Record]
-    def list(pageSize: Int, offset: Int): F[List[Record]]
-    def listWithUser(pageSize: Int, offset: Int): F[List[Full]]
+    type Result[T] = EitherT[F, RepoError, T]
+    def create(c: CreateRecord): Result[Record]
+    def update(c: Record): Result[Record]
+    def get(id: Id): Result[Record]
+    def getByUser(id: User.Id): Result[Record]
+    def delete(id: Id): Result[Unit]
+    def list(pageSize: Int, offset: Int): Result[List[Record]]
+    def listWithUser(pageSize: Int, offset: Int): Result[List[Full]]
   }
 
-  trait Validation[F[_]] {
-    def doesNotExist(c: Company[_]): EitherT[F, ValidationError, Unit]
-    def exists(c: Id): EitherT[F, ValidationError, Unit]
-  }
-
-  class FromRepoValidation[F[_]](repo: Repo[F])(implicit A: Applicative[F]) extends Validation[F] {
-    override def doesNotExist(c: Company[_]): EitherT[F, ValidationError, Unit] =
-      EitherT.fromEither[F](Right[ValidationError.CompanyAlreadyExists, Unit](()))
-
-    override def exists(companyId: Id): EitherT[F, ValidationError, Unit] =
-      repo
-        .get(companyId)
-        .toRight(ValidationError.CompanyNotFound: ValidationError)
-        .void
-  }
-
-  class Service[F[_]: Monad](companyRepo: Repo[F], validation: Validation[F], userService: User.Service[F])(implicit P: PasswordHasher[F, BCrypt]) {
-    def create(company: Create): EitherT[F, ValidationError, Full] =
+  class Service[F[_]: Monad](companyRepo: Repo[F], userService: User.Service[F])(implicit P: PasswordHasher[F, BCrypt]) {
+    type Result[T] = EitherT[F, ValidationError, T]
+    def create(company: Create): Result[Full] =
       for {
-        _ <- validation.doesNotExist(company)
         createdUser <- userService.create(company.rh_user)
-        saved <- EitherT.liftF(companyRepo.create(company.copy(rh_user = createdUser.id)))
+        saved <- companyRepo.create(company.copy(rh_user = createdUser.id)).leftMap[ValidationError](ValidationError.Repo)
       } yield saved.mapData(_.copy(rh_user = createdUser.data))
 
-    def update(company: Update): EitherT[F, ValidationError, Full] =
+    def update(company: Update): Result[Full] =
       for {
-        companyUserId <- companyRepo.get(company.id).map(_.data.rh_user).toRight(ValidationError.CompanyNotFound: ValidationError)
+        companyUserId <- companyRepo.get(company.id).map(_.data.rh_user).leftMap[ValidationError](ValidationError.Repo)
         updatedUser <- userService.update(company.data.rh_user.withId(companyUserId))
         fullCompany = company.mapData(_.copy(rh_user = updatedUser.id))
-        saved <- EitherT.fromOptionF(companyRepo.update(fullCompany).value, ValidationError.CompanyNotFound: ValidationError)
+        saved <- companyRepo.update(fullCompany).leftMap[ValidationError](ValidationError.Repo)
       } yield saved.mapData(_.copy(rh_user = updatedUser.data))
 
-    def get(id: Id): EitherT[F, ValidationError, Full] =
+    def get(id: Id): Result[Full] =
       for {
-        company <- EitherT.fromOptionF(companyRepo.get(id).value, ValidationError.CompanyNotFound: ValidationError)
+        company <- companyRepo.get(id).leftMap[ValidationError](ValidationError.Repo)
         user <- userService.getById(company.data.rh_user)
       } yield company.mapData(_.copy(rh_user = user.data))
 
-    def getFromUser(id: User.Id): EitherT[F, ValidationError, Full] =
+    def getFromUser(id: User.Id): Result[Full] =
       for {
         user <- userService.getById(id)
-        company <-  EitherT.fromOptionF(companyRepo.getByUser(id).value, ValidationError.CompanyNotFound: ValidationError)
+        company <-  companyRepo.getByUser(id).leftMap[ValidationError](ValidationError.Repo)
       } yield company.mapData(_.copy(rh_user = user.data))
 
-    def delete(id: Id): F[Unit] = companyRepo.delete(id).value.as(())
+    def delete(id: Id): Result[Unit] = companyRepo.delete(id).leftMap[ValidationError](ValidationError.Repo)
 
-    def list(pageSize: Int, offset: Int): F[List[Record]] = companyRepo.list(pageSize, offset)
+    def list(pageSize: Int, offset: Int): Result[List[Record]] = companyRepo.list(pageSize, offset).leftMap[ValidationError](ValidationError.Repo)
 
-    def listWithUser(pageSize: Int, offset: Int): F[List[Full]] = companyRepo.listWithUser(pageSize, offset)
+    def listWithUser(pageSize: Int, offset: Int): Result[List[Full]] = companyRepo.listWithUser(pageSize, offset).leftMap[ValidationError](ValidationError.Repo)
   }
 }

@@ -38,10 +38,9 @@ object Main extends IOApp {
       userService = new User.Service[IO](userRepo, new User.FromRepoValidation[IO](userRepo))
 
       companyRepo = new DoobieCompanyRepo[IO](xa)
-      companyValidation = new Company.FromRepoValidation[IO](companyRepo)
-      companyService = new Company.Service[IO](companyRepo, companyValidation, userService)
+      companyService = new Company.Service[IO](companyRepo, userService)
       companyContractRepo = new DoobieCompanyContractRepo[IO](xa)
-      companyContractService = new CompanyContract.Service[IO](companyContractRepo, companyValidation)
+      companyContractService = new CompanyContract.Service[IO](companyContractRepo)
 
       formRepo = new DoobieFormRepo[IO](xa)
       formService = new Form.Service[IO](formRepo)

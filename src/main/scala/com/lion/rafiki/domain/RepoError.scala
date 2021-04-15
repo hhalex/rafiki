@@ -1,5 +1,8 @@
 package com.lion.rafiki.domain
 
+import cats.data.EitherT
+import doobie.ConnectionIO
+import doobie.implicits.toDoobieApplicativeErrorOps
 import org.postgresql.util.PSQLException
 
 import java.sql.SQLException
@@ -17,5 +20,12 @@ object RepoError {
         Other(exception.getMessage)
     }
   }
+
+  implicit class ConnectionIOwithErrors[T](c: ConnectionIO[T]) {
+    def toResult(): EitherT[ConnectionIO, RepoError, T] = EitherT(c.attemptSql).leftMap(RepoError.fromSQLException)
+  }
 }
+
+
+
 

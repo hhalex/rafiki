@@ -63,10 +63,9 @@ object CompanyContract {
     def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): F[List[Record]]
   }
 
-  class Service[F[_]: Monad](companyContractRepo: Repo[F], companyValidation: Company.Validation[F])(implicit P: PasswordHasher[F, BCrypt]) {
+  class Service[F[_]: Monad](companyContractRepo: Repo[F])(implicit P: PasswordHasher[F, BCrypt]) {
     def create(companyContract: CreateRecord): EitherT[F, ValidationError, Record] =
       for {
-        _ <- companyValidation.exists(companyContract.company)
         saved <- EitherT.liftF(companyContractRepo.create(companyContract))
       } yield saved
 

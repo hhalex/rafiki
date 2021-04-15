@@ -28,7 +28,7 @@ class CompanyEndpoints[F[_]: Sync] extends Http4sDsl[F] {
 
       action.flatMap({
         case Right(createdCompanyAndUser) => Ok(createdCompanyAndUser)
-        case Left(err) => Conflict(s"Error '$err' while creating company.")
+        case Left(err) => BadRequest(s"Error '$err' while creating company.")
       })
   }
 
@@ -41,7 +41,7 @@ class CompanyEndpoints[F[_]: Sync] extends Http4sDsl[F] {
 
       action.flatMap {
         case Right(saved) => Ok(saved)
-        case Left(_) => NotFound("The company was not found")
+        case Left(err) => BadRequest(s"Error '$err' while updating the company")
       }
   }
 
@@ -49,29 +49,24 @@ class CompanyEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     case GET -> Root / CompanyIdVar(id) asAuthed _ =>
       companyService.get(id).value.flatMap {
         case Right(found) => Ok(found)
-        case Left(_) => NotFound("The company was not found")
+        case Left(err) => BadRequest(s"Error '$err' while getting the company")
       }
   }
 
   private def deleteCompanyEndpoint(companyService: Company.Service[F]): AuthEndpoint[F] = {
     case DELETE -> Root / CompanyIdVar(id) asAuthed _ =>
-      companyService.get(id).value.flatMap({
-        case Right(company) => for {
-            _ <- companyService.delete(id)
-            resp <- Ok()
-        } yield resp
-        case Left(_) => NotFound("The company was not found")
-      })
+      companyService.delete(id).value.flatMap {
+        case Right(company) => Ok()
+        case Left(err) => BadRequest(s"Error '$err' while deleting the company")
+      }
   }
 
   private def listCompaniesEndpoint(companyService: Company.Service[F]): AuthEndpoint[F] = {
-    case GET -> Root :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(
-    offset,
-    ) asAuthed _ =>
-      for {
-        retrieved <- companyService.listWithUser(pageSize.getOrElse(10), offset.getOrElse(0))
-        resp <- Ok(retrieved)
-      } yield resp
+    case GET -> Root :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(offset) asAuthed _ =>
+      companyService.listWithUser(pageSize.getOrElse(10), offset.getOrElse(0)).value.flatMap {
+        case Right(companies) => Ok(companies)
+        case Left(err) => BadRequest(s"Error '$err' while deleting the company")
+      }
   }
 
   // Global company contracts endpoints
