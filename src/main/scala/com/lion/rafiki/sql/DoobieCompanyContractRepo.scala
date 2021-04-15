@@ -15,55 +15,61 @@ private[sql] object CompanyContractSQL {
   implicit val companyContractIdMeta: Meta[CompanyContract.Id] = Meta[Long].imap(CompanyContract.tagSerial)(_.asInstanceOf[Long])
   implicit val companyContractKindMeta: Meta[CompanyContract.Kind] = Meta[String].imap(CompanyContract.Kind.fromString)(_.toString)
 
-  def byId(id: CompanyContract.Id) =
+  def byIdQ(id: CompanyContract.Id) =
     sql"""SELECT * FROM company_contracts WHERE id=$id""".query[CompanyContract.Record]
 
-  def byCompanyId(id: Company.Id) =
+  def byCompanyIdQ(id: Company.Id) =
     sql"""SELECT * FROM company_contracts WHERE company=$id""".query[CompanyContract.Record]
 
-  def insert(company: Company.Id, kind: CompanyContract.Kind) =
+  def insertQ(company: Company.Id, kind: CompanyContract.Kind) =
     sql"""INSERT INTO company_contracts (company,kind) VALUES ($company,$kind)"""
       .update
 
-  def update(id: CompanyContract.Id, kind: CompanyContract.Kind) = {
+  def updateQ(id: CompanyContract.Id, kind: CompanyContract.Kind) = {
     (fr"UPDATE company_contracts SET kind=$kind WHERE id=$id")
       .update
   }
 
-  def delete(id: CompanyContract.Id) =
+  def deleteQ(id: CompanyContract.Id) =
     sql"""DELETE FROM company_contracts WHERE id=$id"""
       .update
 
-  def listAll(pageSize: Int, offset: Int) =
+  def listAllQ(pageSize: Int, offset: Int) =
     paginate(pageSize, offset)(
       sql"""SELECT * FROM company_contracts""".query[CompanyContract.Record]
     )
 
-  def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int) =
-    paginate(pageSize, offset)(byCompanyId(companyId))
+  def listByCompanyQ(companyId: Company.Id, pageSize: Int, offset: Int) =
+    paginate(pageSize, offset)(byCompanyIdQ(companyId))
 }
 
 class DoobieCompanyContractRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
   extends CompanyContract.Repo[F] {
   import CompanyContractSQL._
-  override def create(companyContract: CompanyContract.CreateRecord): F[CompanyContract.Record] = CompanyContractSQL.insert(companyContract.company, companyContract.kind)
-    .withUniqueGeneratedKeys[CompanyContract.Id]("id")
-    .map(companyContract.withId _)
-    .transact(xa)
+  import com.lion.rafiki.domain.RepoError.ConnectionIOwithErrors
 
-  override def update(company: CompanyContract.Record): OptionT[F, CompanyContract.Record] = OptionT {
-    CompanyContractSQL.update(company.id, company.data.kind).run.flatMap(_ => CompanyContractSQL.byId(company.id).option)
+  override def create(companyContract: CompanyContract.CreateRecord): Result[CompanyContract.Record] =
+    insertQ(companyContract.company, companyContract.kind)
+      .withUniqueGeneratedKeys[CompanyContract.Id]("id")
+      .map(companyContract.withId _)
+      .toResult()
       .transact(xa)
-  }
 
-  override def get(id: CompanyContract.Id): OptionT[F, CompanyContract.Record] = OptionT(CompanyContractSQL.byId(id).option.transact(xa))
+  override def update(company: CompanyContract.Record): Result[CompanyContract.Record] =
+    updateQ(company.id, company.data.kind).run.flatMap(_ => byIdQ(company.id).unique)
+      .toResult()
+      .transact(xa)
 
-  override def delete(id: CompanyContract.Id): OptionT[F, CompanyContract.Record] = OptionT(CompanyContractSQL.byId(id).option)
-    .semiflatMap(company => CompanyContractSQL.delete(id).run.as(company))
+  override def get(id: CompanyContract.Id): Result[CompanyContract.Record] = byIdQ(id).unique.toResult().transact(xa)
+
+  override def delete(id: CompanyContract.Id): Result[Unit] = byIdQ(id).unique
+    .flatMap(_ => deleteQ(id).run.as(()))
+    .toResult()
     .transact(xa)
 
-  override def list(pageSize: Int, offset: Int): F[List[CompanyContract.Record]] =
-    CompanyContractSQL.listAll(pageSize: Int, offset: Int).to[List].transact(xa)
+  override def list(pageSize: Int, offset: Int): Result[List[CompanyContract.Record]] =
+    listAllQ(pageSize: Int, offset: Int).to[List].toResult().transact(xa)
 
-  override def listByCompany(id: Company.Id, pageSize: Int, offset: Int): F[List[CompanyContract.Record]] = CompanyContractSQL.byCompanyId(id).to[List].transact(xa)
+  override def listByCompany(id: Company.Id, pageSize: Int, offset: Int): Result[List[CompanyContract.Record]] =
+    byCompanyIdQ(id).to[List].toResult().transact(xa)
 }

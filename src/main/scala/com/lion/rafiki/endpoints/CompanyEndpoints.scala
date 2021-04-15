@@ -80,7 +80,7 @@ class CompanyEndpoints[F[_]: Sync] extends Http4sDsl[F] {
 
       action.flatMap({
         case Right(createdCompanyContract) => Ok(createdCompanyContract)
-        case Left(err) => BadRequest(s"Error '$err' while creating company contract '${req.request.as[String]}'.")
+        case Left(err) => BadRequest(s"Error '$err' while creating company contract.")
       })
   }
 
@@ -93,7 +93,7 @@ class CompanyEndpoints[F[_]: Sync] extends Http4sDsl[F] {
 
       action.flatMap {
         case Right(saved) => Ok(saved)
-        case Left(err) => BadRequest(s"Error '$err' while updating company contract '${req.request.as[String]}'.")
+        case Left(err) => BadRequest(s"Error '$err' while updating company contract.")
       }
   }
 
@@ -102,40 +102,41 @@ class CompanyEndpoints[F[_]: Sync] extends Http4sDsl[F] {
       companyContractService.get(id).value.flatMap {
         case Right(found) if found.data.company == companyId => Ok(found)
         case Right(_) => BadRequest(s"Error while getting company contract (malformed request).")
-        case Left(err) => BadRequest(s"Error '$err' while getting company contract '${req.request.as[String]}'.")
+        case Left(err) => BadRequest(s"Error '$err' while getting company contract.")
       }
   }
 
   private def deleteCompanyContractEndpoint(companyContractService: CompanyContract.Service[F]): AuthEndpoint[F] = {
     case req @ DELETE -> Root / CompanyIdVar(companyId) / "contract" / CompanyContractIdVar(id) asAuthed _ =>
-      companyContractService.get(id).value.flatMap({
-        case Right(companyContract) if companyContract.data.company == companyId => for {
-          _ <- companyContractService.delete(id)
-          resp <- Ok()
-        } yield resp
+      companyContractService.get(id).value.flatMap {
+        case Right(companyContract) if companyContract.data.company == companyId =>
+          companyContractService.delete(id).value.flatMap {
+            case Right(_) => Ok()
+            case Left(err) => BadRequest(s"Error '$err' while deleting company contract.")
+          }
         case Right(_) => BadRequest(s"Error while deleting company contract (malformed request).")
-        case Left(err) => BadRequest(s"Error '$err' while deleting company contract '${req.request.as[String]}'.")
-      })
+        case Left(err) => BadRequest(s"Error '$err' while deleting company contract.")
+      }
   }
 
   private def listCompanyContractsEndpoint(companyContractService: CompanyContract.Service[F]): AuthEndpoint[F] = {
     case GET -> Root / CompanyIdVar(companyId) / "contract" :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(
     offset,
     ) asAuthed _ =>
-      for {
-        retrieved <- companyContractService.listByCompany(companyId, pageSize.getOrElse(10), offset.getOrElse(0))
-        resp <- Ok(retrieved)
-      } yield resp
+      companyContractService.listByCompany(companyId, pageSize.getOrElse(10), offset.getOrElse(0)).value.flatMap {
+        case Right(list) => Ok(list)
+        case Left(err) => BadRequest(s"Error '$err' while listing company contracts.")
+      }
   }
 
   private def listAllCompanyContractsEndpoint(companyContractService: CompanyContract.Service[F]): AuthEndpoint[F] = {
     case GET -> Root / "contract":? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(
     offset,
     ) asAuthed _ =>
-      for {
-        retrieved <- companyContractService.list(pageSize.getOrElse(10), offset.getOrElse(0))
-        resp <- Ok(retrieved)
-      } yield resp
+      companyContractService.list(pageSize.getOrElse(10), offset.getOrElse(0)).value.flatMap {
+        case Right(list) => Ok(list)
+        case Left(err) => BadRequest(s"Error '$err' while listing all company contracts.")
+      }
   }
 
   def endpoints(

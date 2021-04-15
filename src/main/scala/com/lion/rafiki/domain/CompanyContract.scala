@@ -55,34 +55,34 @@ object CompanyContract {
   type Record = WithId[Id, CreateRecord]
 
   trait Repo[F[_]] {
-    def create(c: CreateRecord): F[Record]
-    def update(c: Record): OptionT[F, Record]
-    def get(id: Id): OptionT[F, Record]
-    def delete(id: Id): OptionT[F, Record]
-    def list(pageSize: Int, offset: Int): F[List[Record]]
-    def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): F[List[Record]]
+    type Result[T] = EitherT[F, RepoError, T]
+    def create(c: CreateRecord): Result[Record]
+    def update(c: Record): Result[Record]
+    def get(id: Id): Result[Record]
+    def delete(id: Id): Result[Unit]
+    def list(pageSize: Int, offset: Int): Result[List[Record]]
+    def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): Result[List[Record]]
   }
 
   class Service[F[_]: Monad](companyContractRepo: Repo[F])(implicit P: PasswordHasher[F, BCrypt]) {
-    def create(companyContract: CreateRecord): EitherT[F, ValidationError, Record] =
-      for {
-        saved <- EitherT.liftF(companyContractRepo.create(companyContract))
-      } yield saved
+    type Result[T] = EitherT[F, ValidationError, T]
+    def create(companyContract: CreateRecord): Result[Record] =
+      companyContractRepo.create(companyContract).leftMap[ValidationError](ValidationError.Repo)
 
-    def update(companyContract: Record): EitherT[F, ValidationError, Record] =
-      EitherT.fromOptionF(
-        companyContractRepo.update(companyContract).value,
-        ValidationError.CompanyContractNotFound: ValidationError
-      )
+    def update(companyContract: Record): Result[Record] =
+      companyContractRepo.update(companyContract).leftMap[ValidationError](ValidationError.Repo)
 
-    def get(id: Id): EitherT[F, ValidationError, Record] =
-      EitherT.fromOptionF(companyContractRepo.get(id).value, ValidationError.CompanyContractNotFound: ValidationError)
+    def get(id: Id): Result[Record] =
+      companyContractRepo.get(id).leftMap[ValidationError](ValidationError.Repo)
 
-    def delete(id: Id): F[Unit] = companyContractRepo.delete(id).value.as(())
+    def delete(id: Id): Result[Unit] =
+      companyContractRepo.delete(id).as(()).leftMap[ValidationError](ValidationError.Repo)
 
-    def list(pageSize: Int, offset: Int): F[List[Record]] = companyContractRepo.list(pageSize, offset)
+    def list(pageSize: Int, offset: Int): Result[List[Record]] =
+      companyContractRepo.list(pageSize, offset).leftMap[ValidationError](ValidationError.Repo)
 
-    def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): F[List[Record]] = companyContractRepo.listByCompany(companyId, pageSize, offset)
+    def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): Result[List[Record]] =
+      companyContractRepo.listByCompany(companyId, pageSize, offset).leftMap[ValidationError](ValidationError.Repo)
   }
 }
 
