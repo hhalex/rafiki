@@ -3,7 +3,7 @@ package com.lion.rafiki.endpoints
 import cats.effect.Sync
 import cats.syntax.all._
 import com.lion.rafiki.auth.{Role, UserStore, UsernamePasswordCredentials}
-import com.lion.rafiki.domain.{User, ValidationError}
+import com.lion.rafiki.domain.{User}
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.Decoder
 import org.http4s.{EntityDecoder, HttpRoutes, Response, Status}
@@ -43,7 +43,7 @@ class UserEndpoints[F[_]: Sync] extends Http4sDsl[F] {
 
       action.flatMap {
         case Right(saved) => Ok(saved)
-        case Left(_) => NotFound("User not found")
+        case Left(err) => BadRequest(s"Error '$err' while updating user.")
       }
   }
 
@@ -51,26 +51,26 @@ class UserEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     case GET -> Root :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(
     offset,
     ) asAuthed _ =>
-      for {
-        retrieved <- userService.list(pageSize.getOrElse(10), offset.getOrElse(0))
-        resp <- Ok(retrieved)
-      } yield resp
+      userService.list(pageSize.getOrElse(10), offset.getOrElse(0)).value.flatMap {
+        case Right(list) => Ok(list)
+        case Left(err) => BadRequest(s"Error '$err' while listing users.")
+      }
   }
 
   private def searchByNameEndpoint(userService: User.Service[F]): AuthEndpoint[F] = {
     case GET -> Root / userName asAuthed _ =>
       userService.getByName(userName).value.flatMap {
         case Right(found) => Ok(found)
-        case Left(_) => NotFound("The user was not found")
+        case Left(err) => BadRequest(s"Error '$err' while searching user by name.")
       }
   }
 
   private def deleteUserEndpoint(userService: User.Service[F]): AuthEndpoint[F] = {
     case DELETE -> Root / userName asAuthed _ =>
-      for {
-        _ <- userService.deleteByUserName(userName)
-        resp <- Ok()
-      } yield resp
+      userService.deleteByUserName(userName).value.flatMap {
+        case Right(_) => Ok()
+        case Left(err) => BadRequest(s"Error '$err' while deleting user.")
+      }
   }
 
   def endpoints(

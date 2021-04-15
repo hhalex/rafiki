@@ -35,7 +35,7 @@ object Main extends IOApp {
       _ <- Stream.eval(create.allTables.transact(xa))
 
       userRepo = new DoobieUserRepo[IO](xa)
-      userService = new User.Service[IO](userRepo, new User.FromRepoValidation[IO](userRepo))
+      userService = new User.Service[IO](userRepo)
 
       companyRepo = new DoobieCompanyRepo[IO](xa)
       companyService = new Company.Service[IO](companyRepo, userService)

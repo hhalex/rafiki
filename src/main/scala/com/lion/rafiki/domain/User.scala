@@ -1,5 +1,6 @@
 package com.lion.rafiki.domain
 
+import cats.conversions.all.autoWidenBifunctor
 import cats.data.{EitherT, OptionT}
 import cats.{Applicative, Monad}
 import cats.syntax.all._
@@ -46,62 +47,43 @@ object User {
   type Full = Record
 
   trait Repo[F[_]] {
-    def create(user: CreateRecord): F[Record]
-    def update(user: WithId[Id, User[Option[PasswordHash[BCrypt]]]]): OptionT[F, Record]
-    def get(id: Id): OptionT[F, Record]
-    def delete(id: Id): OptionT[F, Record]
-    def list(pageSize: Int, offset: Int): F[List[Record]]
-    def findByUserName(userName: String): OptionT[F, Record]
-    def deleteByUserName(userName: String): OptionT[F, Record]
+    type Result[T] = EitherT[F, RepoError, T]
+    def create(user: CreateRecord): Result[Record]
+    def update(user: WithId[Id, User[Option[PasswordHash[BCrypt]]]]): Result[Record]
+    def get(id: Id): Result[Record]
+    def delete(id: Id): Result[Unit]
+    def list(pageSize: Int, offset: Int): Result[List[Record]]
+    def findByUserName(userName: String): Result[Record]
+    def deleteByUserName(userName: String): Result[Unit]
   }
 
-  trait Validation[F[_]] {
-    def doesNotExist(c: Create): EitherT[F, ValidationError, Unit]
-    def exists(c: Id): EitherT[F, ValidationError, Unit]
-  }
-
-  class FromRepoValidation[F[_] : Applicative](repo: Repo[F]) extends Validation[F] {
-    override def doesNotExist(user: Create): EitherT[F, ValidationError, Unit] =
-      repo
-        .findByUserName(user.username)
-        .map(ValidationError.UserAlreadyExists(_): ValidationError)
-        .toLeft(())
-
-    override def exists(userId: Id): EitherT[F, ValidationError, Unit] =
-      repo
-        .get(userId)
-        .toRight(ValidationError.UserNotFound: ValidationError)
-        .void
-  }
-
-  class Service[F[_]: Monad](repo: Repo[F], validation: Validation[F])(implicit P: PasswordHasher[F, BCrypt]) {
-    def create(user: Create): EitherT[F, ValidationError, Full] =
+  class Service[F[_]: Monad](repo: Repo[F])(implicit P: PasswordHasher[F, BCrypt]) {
+    type Result[T] = EitherT[F, ValidationError, T]
+    def create(user: Create): Result[Full] =
       for {
-        _ <- validation.doesNotExist(user)
         hashedPassword <- EitherT.liftF(BCrypt.hashpw[F](user.password))
-        saved <- EitherT.liftF[F, ValidationError, Full](repo.create(user.copy(password = hashedPassword)))
+        saved <- repo.create(user.copy(password = hashedPassword)).leftMap[ValidationError](ValidationError.Repo)
       } yield saved
 
-    def getById(userId: Id): EitherT[F, ValidationError, Full] =
-      repo.get(userId).toRight(ValidationError.UserNotFound: ValidationError)
+    def getById(userId: Id): Result[Full] =
+      repo.get(userId).leftMap[ValidationError](ValidationError.Repo)
 
-    def getByName(userName: String): EitherT[F, ValidationError, Full] =
-      repo.findByUserName(userName).toRight(ValidationError.UserNotFound: ValidationError)
+    def getByName(userName: String): Result[Full] =
+      repo.findByUserName(userName).leftMap[ValidationError](ValidationError.Repo)
 
     def delete(userId: Id): F[Unit] =
       repo.delete(userId).value.void
 
-    def deleteByUserName(userName: String): F[Unit] =
-      repo.deleteByUserName(userName).value.void
+    def deleteByUserName(userName: String): Result[Unit] =
+      repo.deleteByUserName(userName).leftMap[ValidationError](ValidationError.Repo)
 
-    def update(user: Update): EitherT[F, ValidationError, Full] =
+    def update(user: Update): Result[Full] =
       for {
-        _ <- validation.exists(user.id)
         password <- EitherT.liftF(if (user.data.password == "") None.pure[F] else BCrypt.hashpw[F](user.data.password).map(Some(_)))
-        saved <- repo.update(user.mapData(_.copy(password = password))).toRight(ValidationError.UserNotFound: ValidationError)
+        saved <- repo.update(user.mapData(_.copy(password = password))).leftMap[ValidationError](ValidationError.Repo)
       } yield saved
 
-    def list(pageSize: Int, offset: Int): F[List[Full]] =
-      repo.list(pageSize, offset)
+    def list(pageSize: Int, offset: Int): Result[List[Full]] =
+      repo.list(pageSize, offset).leftMap[ValidationError](ValidationError.Repo)
   }
 }

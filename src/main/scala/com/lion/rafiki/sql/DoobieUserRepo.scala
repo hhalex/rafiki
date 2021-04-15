@@ -3,10 +3,10 @@ package com.lion.rafiki.sql
 import doobie._
 import doobie.implicits._
 import Fragments.setOpt
-import cats.data.OptionT
+import cats.data.{EitherT, OptionT}
 import cats.effect.Bracket
 import cats.implicits.{catsSyntaxOptionId, toFunctorOps}
-import com.lion.rafiki.domain.{User}
+import com.lion.rafiki.domain.{RepoError, User}
 import com.lion.rafiki.sql.SQLPagination.paginate
 import doobie.util.meta.Meta
 import tsec.passwordhashers.PasswordHash
@@ -18,16 +18,16 @@ private[sql] object UserSQL {
   implicit val passwordReader: Meta[PasswordHash[BCrypt]] = Meta[String].imap(PasswordHash[BCrypt])(_.toString)
   implicit val han = LogHandler.jdkLogHandler
 
-  def byId(id: Long) = sql"SELECT * FROM users WHERE id=$id".query[User.Record]
+  def byIdQ(id: Long) = sql"SELECT * FROM users WHERE id=$id".query[User.Record]
 
-  def byEmail(email: String) =
+  def byEmailQ(email: String) =
     sql"SELECT * FROM users WHERE email=$email".query[User.Record]
 
-  def insert(email: String, passwordHash: PasswordHash[BCrypt]) =
+  def insertQ(email: String, passwordHash: PasswordHash[BCrypt]) =
     sql"INSERT INTO users (email, password) VALUES ($email, $passwordHash)"
       .update
 
-  def update(id: User.Id, email: Option[String], passwordHash: Option[PasswordHash[BCrypt]]) = {
+  def updateQ(id: User.Id, email: Option[String], passwordHash: Option[PasswordHash[BCrypt]]) = {
     val set = setOpt(
       email.map(e => fr"email = $e"),
       passwordHash.map(p => fr"password = $p")
@@ -37,42 +37,45 @@ private[sql] object UserSQL {
       .update
   }
 
-  def delete(id: User.Id) =
+  def deleteQ(id: User.Id) =
     sql"""DELETE FROM users WHERE id=$id"""
       .update
 
-  def getAll(pageSize: Int, offset: Int) = paginate(pageSize, offset)(sql"SELECT * FROM users".query[User.Record])
+  def getAllQ(pageSize: Int, offset: Int) = paginate(pageSize, offset)(sql"SELECT * FROM users".query[User.Record])
 }
 
 class DoobieUserRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
   extends User.Repo[F] {
   import UserSQL._
-  override def create(user: User.CreateRecord): F[User.Record] =
-    UserSQL.insert(user.username, user.password)
+  import RepoError.ConnectionIOwithErrors
+
+  override def create(user: User.CreateRecord): Result[User.Record] =
+    insertQ(user.username, user.password)
       .withUniqueGeneratedKeys[User.Id]("id")
       .map(user.withId _)
+      .toResult()
       .transact(xa)
 
 
-  override def update(user: User.withId[Option[PasswordHash[BCrypt]]]): OptionT[F, User.Record] =
-    OptionT {
-      UserSQL.update(user.id, user.data.username.some, user.data.password).run
-        .flatMap(_ => UserSQL.byId(user.id).option)
+  override def update(user: User.withId[Option[PasswordHash[BCrypt]]]): Result[User.Record] =
+      updateQ(user.id, user.data.username.some, user.data.password).run
+        .flatMap(_ => byIdQ(user.id).unique)
+        .toResult()
         .transact(xa)
-    }
 
-  override def get(id: User.Id): OptionT[F, User.Record] = OptionT(UserSQL.byId(id).option.transact(xa))
+  override def get(id: User.Id): Result[User.Record] = byIdQ(id).unique.toResult().transact(xa)
 
-  override def delete(id: User.Id): OptionT[F, User.Record] = OptionT(UserSQL.byId(id).option)
-    .semiflatMap(user => UserSQL.delete(user.id).run.as(user))
+  override def delete(id: User.Id): Result[Unit] = byIdQ(id).unique
+    .flatMap(user => deleteQ(user.id).run.as(()))
+    .toResult()
     .transact(xa)
 
-  override def list(pageSize: Int, offset: Int): F[List[User.Record]] =
-    UserSQL.getAll(pageSize: Int, offset: Int).to[List].transact(xa)
+  override def list(pageSize: Int, offset: Int): Result[List[User.Record]] =
+    getAllQ(pageSize: Int, offset: Int).to[List].toResult().transact(xa)
 
-  override def findByUserName(userName: String): OptionT[F, User.Record] =
-    OptionT(UserSQL.byEmail(userName).option).transact(xa)
+  override def findByUserName(userName: String): Result[User.Record] =
+    byEmailQ(userName).unique.toResult().transact(xa)
 
-  override def deleteByUserName(userName: String): OptionT[F, User.Record] =
+  override def deleteByUserName(userName: String): Result[Unit] =
     findByUserName(userName).flatMap(u => delete(u.id))
 }
