@@ -38,14 +38,14 @@ export const FormCRUD = ({api}: APIProps) => {
 
   return <div>
     <Switch>
-      <Route path={`${path}/:id`} children={<FormEdit api={api} back={backHome} />} />
-      <Route path={`${path}/new`}>
+    <Route path={`${path}/new`}>
         <ValidatedForm
           initialValues={{}}
           submit={(data: Form.Create) => { api.create(data).catch(() => {}); }}
           back={backHome}
         />
       </Route>
+      <Route path={`${path}/:id`} children={<FormEdit api={api} back={backHome} />} />
       <Route path={path}>
         <FormOverview api={api}/>
       </Route>
@@ -119,7 +119,6 @@ export const FormCRUD = ({api}: APIProps) => {
     
 
   const ValidatedForm = ({initialValues, back, submit}: {initialValues: EditorData, back: () => void, submit: ((_: Form.Create) => void) | ((_: Form.Update) => void) }) => {
-    const { url } = useRouteMatch();
     const formik = useFormik<EditorData>({
       initialValues: {
         name: "",
@@ -176,7 +175,7 @@ export const FormCRUD = ({api}: APIProps) => {
       <Button color="primary" onClick={back}>
         Annuler
       </Button>
-      <Button onClick={() => { formik.handleSubmit(); }} color="primary">
+      <Button onClick={formik.handleSubmit as any} color="primary">
         {editOrAddLabel}
       </Button>
     </>
