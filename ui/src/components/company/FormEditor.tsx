@@ -5,9 +5,9 @@ import * as Yup from "yup";
 import { useFormik } from "formik";
 import {Edit, Delete}  from '@material-ui/icons';
 import AddIcon from '@material-ui/icons/Add';
+import { Link, Route, Switch, useHistory, useParams, useRouteMatch } from "react-router-dom";
 
 const useStylesCRUD = makeStyles({
-  root: {},
   table: {  },
   addIcon: {
     margin: "2em",
@@ -28,36 +28,45 @@ type EditorData = {
   tree?: Form.Tree,
 };
 
-export const FormCRUD = ({api}: {api: ReturnType<typeof Form.createApi>}) => {
+type APIProps = {api: ReturnType<typeof Form.createApi>}
+
+export const FormCRUD = ({api}: APIProps) => {
+  const { path, url } = useRouteMatch();
+  const history = useHistory();
+
+  const backHome = () => history.push(url);
+
+  return <div>
+    <Switch>
+      <Route path={`${path}/:id`} children={<FormEdit api={api} back={backHome} />} />
+      <Route path={`${path}/new`}>
+        <ValidatedForm
+          initialValues={{}}
+          submit={(data: Form.Create) => { api.create(data).catch(() => {}); }}
+          back={backHome}
+        />
+      </Route>
+      <Route path={path}>
+        <FormOverview api={api}/>
+      </Route>
+    </Switch>
+    
+  </div>;
+};
+
+  const FormOverview = ({api}: APIProps) => {
     const classes = useStylesCRUD();
-  
+    const { path, url } = useRouteMatch();
+    
     const [list, setList] = React.useState<Form.Full[]>([]);
-    const [editorData, setEditorData] = React.useState<EditorData | undefined>(undefined);
-  
-    const initAdd = () => setEditorData({});
-    const initEdit = setEditorData;
-    const handleClose = () => setEditorData(undefined);
   
     const listEntries = () => api.list().then(setList);
-    
-    const editOrAdd = (data: Form.Create | Form.Update) => {
-        if ("id" in data) {
-          return api.update(data)
-            .then(listEntries)
-            .catch(() => {});
-            
-        }
-        return api.create(data)
-                .then(listEntries)
-                .catch(() => {})
-    };
-  
     const deleteEntry = (formId: string) =>
       api.delete(formId).then(listEntries).catch(() => {});
-  
+
     useEffect(listEntries as any, []);
-  
-    return <div className={classes.root}>
+
+    return <>
       <TableContainer className={classes.table}>
         <Table aria-label="simple table">
           <TableHead>
@@ -77,7 +86,7 @@ export const FormCRUD = ({api}: {api: ReturnType<typeof Form.createApi>}) => {
                 <TableCell>{form.name}</TableCell>
                 <TableCell>{form.description}</TableCell>
                 <TableCell align="right">
-                  <Edit className={classes.editIcon} onClick={() => initEdit(form)}/>
+                  <Link to={`${url}/${form.id}`} ><Edit className={classes.editIcon}/></Link>
                   <Delete className={classes.deleteIcon} onClick={() => deleteEntry(form.id)}/>
                 </TableCell>
               </TableRow>
@@ -85,14 +94,32 @@ export const FormCRUD = ({api}: {api: ReturnType<typeof Form.createApi>}) => {
           </TableBody>
         </Table>
       </TableContainer>
-      <Fab className={classes.addIcon} color="primary" aria-label="add" onClick={initAdd} >
-        <AddIcon/>
-      </Fab>
-      {editorData && <ValidatedForm initialValues={{...editorData}} close={handleClose} submit={editOrAdd}/>}
-    </div>;
+      <Link to={`${url}/new`} >
+        <Fab className={classes.addIcon} color="primary" aria-label="add">
+          <AddIcon/>
+        </Fab>
+      </Link>
+    </>;
   };
 
-  const ValidatedForm = ({initialValues, close, submit}: {initialValues: EditorData, close: () => void, submit: (e: Form.Create | Form.Update) => void}) => {
+  const FormEdit = ({api, back}: APIProps & {back: () => void}) => {
+    const { id } = useParams<{id: any}>();
+    const [data, setData] = React.useState<Form.Full | undefined>(undefined);
+    
+    useEffect(() => api.getById(id).then(setData) as any, []);
+
+    return data
+      ? <ValidatedForm
+          initialValues={data}
+          submit={(data: Form.Update) => { api.update(data).catch(() => {}); }}
+          back={back}
+        />
+      : <div>Loading</div>
+  }
+    
+
+  const ValidatedForm = ({initialValues, back, submit}: {initialValues: EditorData, back: () => void, submit: ((_: Form.Create) => void) | ((_: Form.Update) => void) }) => {
+    const { url } = useRouteMatch();
     const formik = useFormik<EditorData>({
       initialValues: {
         name: "",
@@ -106,55 +133,51 @@ export const FormCRUD = ({api}: {api: ReturnType<typeof Form.createApi>}) => {
       }),
       onSubmit:(values) => {
         submit(values as any);
-        close();
+        back();
       }
     });
 
     const editOrAddLabel = initialValues?.id ? "Editer" : "Ajouter";
 
-    return <Dialog open onClose={close} aria-labelledby="form-dialog-title">
-      <DialogTitle id="form-dialog-title">{editOrAddLabel} un formulaire</DialogTitle>
-        <DialogContent>
-          <TextField
-            id="id"
-            label="Id"
-            fullWidth
-            margin="dense"
-            variant="outlined"
-            defaultValue={initialValues.id}
-            disabled={true}
-          />
-          <TextField
-            id="name"
-            label="Nom"
-            fullWidth
-            margin="normal"
-            variant="outlined"
-            value={formik.values.name}
-            onChange={formik.handleChange}
-            error={formik.touched.name && Boolean(formik.errors.name)}
-            helperText={formik.touched.name && formik.errors.name}
-          />
-          <TextField
-            id="description"
-            label="Description"
-            fullWidth
-            margin="normal"
-            variant="outlined"
-            value={formik.values.description}
-            onChange={formik.handleChange}
-            error={formik.touched.description && Boolean(formik.errors.description)}
-            helperText={formik.touched.description && formik.errors.description}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={close} color="primary">
-            Annuler
-          </Button>
-          <Button onClick={() => { formik.handleSubmit(); }} color="primary">
-            {editOrAddLabel}
-          </Button>
-        </DialogActions>
-      </Dialog>
+    return <>
+      <h2>{editOrAddLabel} un formulaire</h2>
+      <TextField
+        id="id"
+        label="Id"
+        fullWidth
+        margin="dense"
+        variant="outlined"
+        defaultValue={initialValues.id}
+        disabled={true}
+      />
+      <TextField
+        id="name"
+        label="Nom"
+        fullWidth
+        margin="normal"
+        variant="outlined"
+        value={formik.values.name}
+        onChange={formik.handleChange}
+        error={formik.touched.name && Boolean(formik.errors.name)}
+        helperText={formik.touched.name && formik.errors.name}
+      />
+      <TextField
+        id="description"
+        label="Description"
+        fullWidth
+        margin="normal"
+        variant="outlined"
+        value={formik.values.description}
+        onChange={formik.handleChange}
+        error={formik.touched.description && Boolean(formik.errors.description)}
+        helperText={formik.touched.description && formik.errors.description}
+      />
+    
+      <Button color="primary" onClick={back}>
+        Annuler
+      </Button>
+      <Button onClick={() => { formik.handleSubmit(); }} color="primary">
+        {editOrAddLabel}
+      </Button>
+    </>
   }
-  
