@@ -3,8 +3,6 @@ package com.lion.rafiki.domain
 import cats.data.EitherT
 import doobie.ConnectionIO
 import doobie.implicits.toDoobieApplicativeErrorOps
-import org.postgresql.util.PSQLException
-
 import java.sql.SQLException
 
 sealed trait RepoError

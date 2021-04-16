@@ -5,6 +5,8 @@ import Tab from '@material-ui/core/Tab';
 import { Link, Route, Switch, useLocation, useRouteMatch } from "react-router-dom";
 import { AuthenticatedFetch } from '../atoms/Auth';
 import { Typography } from '@material-ui/core';
+import { FormCRUD } from '../components/company/FormEditor';
+import { Form } from '../api/company/form';
 
 const useStyles = makeStyles((theme: Theme) => ({
   root: {
@@ -49,6 +51,9 @@ const NavTab = ({to, label}: {to: string, label: string}) => {
 export default function CompanyView({authFetch}: {authFetch: AuthenticatedFetch}) {
   const classes = useStyles();
   const { path, url } = useRouteMatch();
+
+  const formApi = Form.createApi(authFetch);
+
   return (
     <div className={classes.root}>
       <div className={classes.header}>
@@ -69,7 +74,7 @@ export default function CompanyView({authFetch}: {authFetch: AuthenticatedFetch}
         <div className={classes.panel}>
           <Switch>
             <Route path={`${path}/forms`}>
-              Formulaires
+              <FormCRUD api={formApi} />
             </Route>
             <Route path={`${path}/sessions`}>
               Sessions

@@ -8,10 +8,12 @@
     "@testing-library/jest-dom": "^5.11.4",
     "@testing-library/react": "^11.2.6",
     "@testing-library/user-event": "^12.1.10",
+    "formik": "^2.2.6",
     "react": "17.0.2",
     "react-dom": "17.0.2",
     "react-router-dom": "5.2.0",
-    "recoil": "0.2.0"
+    "recoil": "0.2.0",
+    "yup": "^0.32.9"
   },
   "scripts": {
     "start": "webpack serve --port 9000 --mode development --open --hot",
