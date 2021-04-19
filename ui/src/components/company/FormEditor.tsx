@@ -36,7 +36,7 @@ export const FormCRUD = ({api}: APIProps) => {
 
   const backHome = () => history.push(url);
 
-  return <div>
+  return <div style={{margin: "1em"}}>
     <Switch>
     <Route path={`${path}/new`}>
         <ValidatedForm
@@ -71,7 +71,6 @@ export const FormCRUD = ({api}: APIProps) => {
         <Table aria-label="simple table">
           <TableHead>
             <TableRow>
-              <TableCell>#</TableCell>
               <TableCell>Nom</TableCell>
               <TableCell>Description</TableCell>
               <TableCell align="right"></TableCell>
@@ -80,9 +79,6 @@ export const FormCRUD = ({api}: APIProps) => {
           <TableBody>
             {list.map(form => (
               <TableRow key={form.id}>
-                <TableCell component="th" scope="row">
-                  {form.id}
-                </TableCell>
                 <TableCell>{form.name}</TableCell>
                 <TableCell>{form.description}</TableCell>
                 <TableCell align="right">
@@ -141,20 +137,9 @@ export const FormCRUD = ({api}: APIProps) => {
     return <>
       <h2>{editOrAddLabel} un formulaire</h2>
       <TextField
-        id="id"
-        label="Id"
-        fullWidth
-        margin="dense"
-        variant="outlined"
-        defaultValue={initialValues.id}
-        disabled={true}
-      />
-      <TextField
         id="name"
         label="Nom"
-        fullWidth
         margin="normal"
-        variant="outlined"
         value={formik.values.name}
         onChange={formik.handleChange}
         error={formik.touched.name && Boolean(formik.errors.name)}
@@ -165,7 +150,6 @@ export const FormCRUD = ({api}: APIProps) => {
         label="Description"
         fullWidth
         margin="normal"
-        variant="outlined"
         value={formik.values.description}
         onChange={formik.handleChange}
         error={formik.touched.description && Boolean(formik.errors.description)}
