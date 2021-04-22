@@ -99,8 +99,8 @@ private[sql] object FormSQL {
   def deleteTreeChildQ(parentKey: Form.Tree.Key, notIn: Seq[Form.Tree.Key]) = {
     // On CASCADE DELETE will remove all child elements automatically
     val (id, kind) = parentKey
-    val notInFr = Seq(fr"(parent_id=$id AND parent_kind=$kind)") ++ notIn.map(key => fr"not(id=${key._1} AND kind=${key._2})")
-    (sql"""DELETE FROM form_trees""" ++ whereAnd(notInFr: _*))
+    val notInFr = Seq(fr"(parent_id=$id AND parent_kind=$kind)") ++ notIn.map(key => fr0"not(id=${key._1} AND kind=${key._2})")
+    (fr"DELETE FROM form_trees" ++ whereAnd(notInFr: _*))
       .update
   }
 
@@ -121,12 +121,12 @@ private[sql] object FormSQL {
   }
 
   def updateTreeGroupQ(id: Form.Tree.Id) = {
-    sql"UPDATE form_tree_groups SET 1=1 WHERE id=$id"
+    sql"UPDATE form_tree_groups SET id=$id WHERE id=$id"
       .update
   }
 
   def deleteQ(id: Form.Id) =
-    sql"DELETE FROM form; WHERE id=$id"
+    sql"DELETE FROM forms WHERE id=$id"
       .update
 
   def listAllQ(pageSize: Int, offset: Int) =
