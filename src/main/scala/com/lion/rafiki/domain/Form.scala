@@ -19,7 +19,7 @@ object Form {
   val tagSerial = tag[Form[_]](_: Long)
 
   sealed trait Tree {
-    lazy val kind = this match {
+    val kind = this match {
       case _: Tree.Text | _: Tree.TextWithKey => Tree.Kind.Text
       case _: Tree.Question | _: Tree.QuestionWithKey => Tree.Kind.Question
       case _: Tree.Group | _: Tree.GroupWithKey => Tree.Kind.Group
@@ -28,7 +28,7 @@ object Form {
   }
   sealed trait TreeWithKey extends Tree {
     val id: Tree.Id
-    lazy val key = (id, kind)
+    val key = (id, kind)
   }
 
   object Tree {
@@ -87,22 +87,30 @@ object Form {
     type Update = TreeWithKey
     type Record = TreeWithKey
 
-    implicit val formTreeDecoder: Decoder[Tree] = List[Decoder[Tree]](
-      Decoder[Text].widen,
-      Decoder[TextWithKey].widen,
-      Decoder[Question].widen,
+    implicit val formTreeWithKeyEncoder: Encoder[TreeWithKey] = Encoder.instance {
+      case r: TextWithKey => r.asJson
+      case r: QuestionWithKey => r.asJson
+      case r: GroupWithKey => r.asJson
+    }
+
+    implicit val formTreeWithKeyDecoder: Decoder[TreeWithKey] = List[Decoder[TreeWithKey]](
       Decoder[QuestionWithKey].widen,
-      Decoder[Group].widen,
+      Decoder[TextWithKey].widen,
       Decoder[GroupWithKey].widen
     ).reduceLeft(_ or _)
 
+    implicit val formTreeDecoder: Decoder[Tree] = List[Decoder[Tree]](
+      Decoder[TreeWithKey].widen,
+      Decoder[Question].widen,
+      Decoder[Text].widen,
+      Decoder[Group].widen
+    ).reduceLeft(_ or _)
+
     implicit val formTreeEncoder: Encoder[Tree] = Encoder.instance {
+      case r: TreeWithKey => r.asJson
       case r: Text => r.asJson
-      case r: TextWithKey => r.asJson
       case r: Question => r.asJson
-      case r: QuestionWithKey => r.asJson
       case r: Group => r.asJson
-      case r: GroupWithKey => r.asJson
     }
   }
 
@@ -115,20 +123,17 @@ object Form {
   implicit val formRecordEncoder: Encoder[Record] = WithId.encoder
   implicit val formFullEncoder: Encoder[Full] = WithId.encoder
 
-  type Create = Form[Tree.Key]
-  type Update = WithId[Id, Form[Tree.Key]]
-  type Record = Update
-  type Full = WithId[Id, Form[Tree]]
+  type Create = Form[Tree]
+  type Update = WithId[Id, Create]
+  type Record = WithId[Id, Form[Tree.Key]]
+  type Full = WithId[Id, Form[TreeWithKey]]
 
   trait Repo[F[_]] {
     type Result[T] = EitherT[F, RepoError, T]
-    def create(form: Create): Result[Record]
-    def update(form: Update): Result[Record]
-    def syncTree(tree: Tree, parent: Option[Tree.Key]): Result[Tree]
-    def get(id: Id): Result[Record]
-    def getWithTree(id: Id): Result[Full]
-    def delete(id: Id): Result[Record]
-    def deleteTree(key: Tree.Key): Result[Unit]
+    def create(form: Create): Result[Full]
+    def update(form: Update): Result[Full]
+    def get(id: Id): Result[Full]
+    def delete(id: Id): Result[Unit]
     def list(pageSize: Int, offset: Int): Result[List[Record]]
     def listByCompany(company: Company.Id, pageSize: Int, offset: Int): Result[List[Record]]
   }
@@ -141,16 +146,16 @@ object Form {
   class Service[F[_] : Monad](repo: Repo[F]) {
     type Result[T] = EitherT[F, ValidationError, T]
     // forms
-    def create(form: Create): Result[Record] = {
+    def create(form: Create): Result[Full] = {
       repo.create(form).leftMap(ValidationError.Repo)
     }
-    def getById(formId: Id): Result[Record] = {
+    def getById(formId: Id): Result[Full] = {
       repo.get(formId).leftMap(ValidationError.Repo)
     }
     def delete(formId: Id): Result[Unit] = {
       repo.delete(formId).as(()).leftMap(ValidationError.Repo)
     }
-    def update(form: Update): Result[Record] = {
+    def update(form: Update): Result[Full] = {
       repo.update(form).leftMap(ValidationError.Repo)
     }
     def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): Result[List[Record]] =

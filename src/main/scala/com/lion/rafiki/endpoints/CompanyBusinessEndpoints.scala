@@ -43,7 +43,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
           if (formOwner.contains(companyUser.id))
             formService.update(form.copy(company = formOwner).withId(id))
           else
-            EitherT.leftT[F, Form.Record](ValidationError.NotAllowed: ValidationError)
+            EitherT.leftT[F, Form.Full](ValidationError.NotAllowed: ValidationError)
         }
       } yield result
 
@@ -62,7 +62,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
           if (form.data.company.contains(companyUser.id))
             EitherT.rightT[F, ValidationError](form)
           else
-            EitherT.leftT[F, Form.Record](ValidationError.NotAllowed: ValidationError)
+            EitherT.leftT[F, Form.Full](ValidationError.NotAllowed: ValidationError)
         }
       } yield result
 

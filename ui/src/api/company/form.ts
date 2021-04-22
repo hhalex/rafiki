@@ -15,6 +15,7 @@ export namespace Form {
         export type Question = {label: string, text: string};
         export type Text = {text: string};
         export type Group = {children: Tree[]};
+        export type QuestionGroup = {children: Question[]};
     }
 
     export type Create = Form<null>;
