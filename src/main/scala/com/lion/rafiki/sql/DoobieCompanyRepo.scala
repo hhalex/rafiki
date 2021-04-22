@@ -28,9 +28,8 @@ private[sql] object CompanySQL {
     sql"""INSERT INTO companies (name,rh_user) VALUES ($name,$rh_user)"""
       .update
 
-  def updateQ(id: Company.Id, name: Option[String]) = {
-    val set = setOpt(name.map(n => fr"name = $n"))
-    (fr"UPDATE companies" ++ set ++ fr"WHERE id=$id")
+  def updateQ(id: Company.Id, name: String) = {
+    (sql"UPDATE companies SET name=$name WHERE id=$id")
       .update
   }
 
@@ -62,7 +61,7 @@ class DoobieCompanyRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
     .transact(xa)
 
   override def update(company: Company.Record): Result[Company.Record] = {
-    updateQ(company.id, company.data.name.some).run.flatMap(_ => byIdQ(company.id).unique)
+    updateQ(company.id, company.data.name).run.flatMap(_ => byIdQ(company.id).unique)
       .toResult()
       .transact(xa)
   }
