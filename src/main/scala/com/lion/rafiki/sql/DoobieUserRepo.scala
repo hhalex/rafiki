@@ -3,7 +3,6 @@ package com.lion.rafiki.sql
 import doobie._
 import doobie.implicits._
 import Fragments.setOpt
-import cats.data.{EitherT, OptionT}
 import cats.effect.Bracket
 import cats.implicits.{catsSyntaxOptionId, toFunctorOps}
 import com.lion.rafiki.domain.{RepoError, User}
@@ -18,7 +17,7 @@ private[sql] object UserSQL {
   implicit val passwordReader: Meta[PasswordHash[BCrypt]] = Meta[String].imap(PasswordHash[BCrypt])(_.toString)
   implicit val han = LogHandler.jdkLogHandler
 
-  def byIdQ(id: Long) = sql"SELECT * FROM users WHERE id=$id".query[User.Record]
+  def byIdQ(id: User.Id) = sql"SELECT * FROM users WHERE id=$id".query[User.Record]
 
   def byEmailQ(email: String) =
     sql"SELECT * FROM users WHERE email=$email".query[User.Record]
@@ -41,7 +40,9 @@ private[sql] object UserSQL {
     sql"""DELETE FROM users WHERE id=$id"""
       .update
 
-  def getAllQ(pageSize: Int, offset: Int) = paginate(pageSize, offset)(sql"SELECT * FROM users".query[User.Record])
+  def listAllQ(pageSize: Int, offset: Int) = paginate(pageSize, offset)(
+    sql"SELECT * FROM users".query[User.Record]
+  )
 }
 
 class DoobieUserRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
@@ -71,7 +72,7 @@ class DoobieUserRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
     .transact(xa)
 
   override def list(pageSize: Int, offset: Int): Result[List[User.Record]] =
-    getAllQ(pageSize: Int, offset: Int).to[List].toResult().transact(xa)
+    listAllQ(pageSize: Int, offset: Int).to[List].toResult().transact(xa)
 
   override def findByUserName(userName: String): Result[User.Record] =
     byEmailQ(userName).unique.toResult().transact(xa)
