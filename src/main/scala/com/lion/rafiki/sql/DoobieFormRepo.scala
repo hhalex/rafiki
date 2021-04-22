@@ -133,35 +133,13 @@ private[sql] object FormSQL {
     paginate(pageSize, offset)(
       sql"SELECT * FROM forms".query[Form.Record]
     )
-}
 
-class DoobieFormRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
-  extends Form.Repo[F] {
-  import FormSQL._
-  import RepoError.ConnectionIOwithErrors
-
-  override def create(form: Form.Create): Result[Form.Full] = (for {
-    createdTreeKey <- form.tree.traverse(t => syncTreeRec(t, None))
-    id <- insertQ(form.company, form.name, form.description, createdTreeKey)
-      .withUniqueGeneratedKeys[Form.Id]("id")
-    createdForm <- getCIO(id)
-  } yield createdForm).toResult().transact(xa)
-
-
-  override def update(form: Form.Update): Result[Form.Full] = (for {
-    updateTreeKey <- form.data.tree.traverse(t => syncTreeRec(t, None))
-    _ <- updateQ(form.id, form.data.company, form.data.name, form.data.description, updateTreeKey).run
-    updatedForm <- getCIO(form.id)
-  } yield updatedForm).toResult().transact(xa)
-
-  override def get(id: Form.Id): Result[Form.Full] = getCIO(id).toResult().transact(xa)
-
-  private def getCIO(id: Form.Id): ConnectionIO[Form.Full] = for {
+  def getCIO(id: Form.Id): ConnectionIO[Form.Full] = for {
     form <- byIdQ(id).unique
     tree <- form.data.tree.traverse(getTreeRecCIO)
   } yield form.mapData(_.copy(tree = tree))
 
-  private def getTreeRecCIO(key: Form.Tree.Key): ConnectionIO[Form.TreeWithKey] = {
+  def getTreeRecCIO(key: Form.Tree.Key): ConnectionIO[Form.TreeWithKey] = {
     val (id, kind) = key
     kind match {
       case Form.Tree.Kind.Group =>
@@ -176,6 +154,90 @@ class DoobieFormRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
     }
   }
 
+  def syncTree(tree: Form.Tree, parent: Option[Form.Tree.Key]): ConnectionIO[Form.Tree.Key] = for {
+    parentChildPairs <- addOrUpdateTreeNodesRec(tree, parent)
+    _ <- parentChildPairs._2.traverse(pair => deleteTreeChildQ(pair._1, pair._2).run)
+  } yield parentChildPairs._1
+
+  type Acc =  List[(Form.Tree.Key, List[Form.Tree.Key])]
+  private def addOrUpdateTreeNodesRec(tree: Form.Tree, parent: Option[Form.Tree.Key]): ConnectionIO[(Form.Tree.Key, Acc)] = {
+    import Form.Tree._
+    tree match {
+      case g: GroupWithKey => for {
+        updatedKey <- updateTreeGroupCIO(g, parent)
+        updatedChildrenKeys <- g.children.traverse(c => addOrUpdateTreeNodesRec(c, updatedKey.some))
+        (directChilds, rest) = updatedChildrenKeys.unzip
+      } yield (updatedKey, (updatedKey, directChilds) :: rest.flatten)
+      case g: Group => for {
+        createdKey <- insertTreeGroupCIO(g, parent)
+        childKeys <- g.children.traverse(c => addOrUpdateTreeNodesRec(c, createdKey.some))
+        (directChilds, rest) = childKeys.unzip
+      } yield (createdKey, (createdKey, directChilds) :: rest.flatten)
+      case t: TextWithKey => updateTreeTextCIO(t, parent).map((_, Nil))
+      case t: Text => insertTreeTextCIO(t, parent).map((_, Nil))
+      case q: QuestionWithKey => updateTreeQuestionCIO(q, parent).map((_, Nil))
+      case q: Question => insertTreeQuestionCIO(q, parent).map((_, Nil))
+    }
+  }
+
+  def updateTreeGroupCIO(g: Form.Tree.GroupWithKey, parent: Option[Form.Tree.Key]): ConnectionIO[Form.Tree.Key] =
+    for {
+      _ <- updateTreeHeaderQ(g.key, parent).run
+      _ <- updateTreeGroupQ(g.id).run
+    } yield g.key
+
+  def insertTreeGroupCIO(g: Form.Tree.Group, parent: Option[Form.Tree.Key]): ConnectionIO[Form.Tree.Key] =
+    for {
+      generatedId <- insertTreeHeaderQ(g.kind, parent).withUniqueGeneratedKeys[Form.Tree.Id]("id")
+      _ <- insertTreeGroupQ(generatedId).run
+    } yield (generatedId, g.kind)
+
+  def insertTreeTextCIO(t: Form.Tree.Text, parent: Option[Form.Tree.Key]): ConnectionIO[Form.Tree.Key] =
+    for {
+      generatedId <- insertTreeHeaderQ(Form.Tree.Kind.Text, parent).withUniqueGeneratedKeys[Form.Tree.Id]("id")
+      _ <- insertTreeTextQ(generatedId, t.text).run
+    } yield  (generatedId, t.kind)
+
+  def updateTreeTextCIO(t: Form.Tree.TextWithKey, parent: Option[Form.Tree.Key]): ConnectionIO[Form.Tree.Key] =
+    for {
+      _ <- updateTreeHeaderQ(t.key, parent).run
+      _ <- updateTreeTextQ(t.id, t.text).run
+    } yield t.key
+
+  def insertTreeQuestionCIO(q: Form.Tree.Question, parent: Option[Form.Tree.Key]): ConnectionIO[Form.Tree.Key] =
+    for {
+      generatedId <- insertTreeHeaderQ(q.kind, parent).withUniqueGeneratedKeys[Form.Tree.Id]("id")
+      _ <- insertTreeQuestionQ(generatedId, q.label, q.text).run
+    } yield (generatedId, q.kind)
+
+  def updateTreeQuestionCIO(q: Form.Tree.QuestionWithKey, parent: Option[Form.Tree.Key]): ConnectionIO[Form.Tree.Key] =
+    for {
+      _ <- updateTreeHeaderQ(q.key, parent).run
+      _ <- updateTreeQuestionQ(q.id, q.label, q.text).run
+    } yield q.key
+
+}
+
+class DoobieFormRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
+  extends Form.Repo[F] {
+  import FormSQL._
+  import RepoError.ConnectionIOwithErrors
+
+  override def create(form: Form.Create): Result[Form.Full] = (for {
+    createdTreeKey <- form.tree.traverse(t => syncTree(t, None))
+    id <- insertQ(form.company, form.name, form.description, createdTreeKey)
+      .withUniqueGeneratedKeys[Form.Id]("id")
+    createdForm <- getCIO(id)
+  } yield createdForm).toResult().transact(xa)
+
+  override def update(form: Form.Update): Result[Form.Full] = (for {
+    updateTreeKey <- form.data.tree.traverse(t => syncTree(t, None))
+    _ <- updateQ(form.id, form.data.company, form.data.name, form.data.description, updateTreeKey).run
+    updatedForm <- getCIO(form.id)
+  } yield updatedForm).toResult().transact(xa)
+
+  override def get(id: Form.Id): Result[Form.Full] = getCIO(id).toResult().transact(xa)
+
   override def delete(id: Form.Id): Result[Unit] = (for {
     form <- byIdQ(id).unique
     _ <- deleteQ(form.id).run
@@ -186,60 +248,6 @@ class DoobieFormRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
   override def list(pageSize: Int, offset: Int): Result[List[Form.Record]] =
     listAllQ(pageSize: Int, offset: Int).to[List].toResult().transact(xa)
 
-  private def updateTreeGroupCIO(g: Form.Tree.GroupWithKey, parent: Option[Form.Tree.Key]): ConnectionIO[Form.Tree.Key] =
-    for {
-      _ <- updateTreeHeaderQ(g.key, parent).run
-      _ <- updateTreeGroupQ(g.id).run
-    } yield g.key
-
-  private def insertTreeGroupCIO(g: Form.Tree.Group, parent: Option[Form.Tree.Key]): ConnectionIO[Form.Tree.Key] =
-    for {
-      generatedId <- insertTreeHeaderQ(g.kind, parent).withUniqueGeneratedKeys[Form.Tree.Id]("id")
-      _ <- insertTreeGroupQ(generatedId).run
-    } yield (generatedId, g.kind)
-
-  private def insertTreeTextCIO(t: Form.Tree.Text, parent: Option[Form.Tree.Key]): ConnectionIO[Form.Tree.Key] =
-    for {
-      generatedId <- insertTreeHeaderQ(Form.Tree.Kind.Text, parent).withUniqueGeneratedKeys[Form.Tree.Id]("id")
-      _ <- insertTreeTextQ(generatedId, t.text).run
-    } yield  (generatedId, t.kind)
-
-  private def updateTreeTextCIO(t: Form.Tree.TextWithKey, parent: Option[Form.Tree.Key]): ConnectionIO[Form.Tree.Key] =
-    for {
-      _ <- updateTreeHeaderQ(t.key, parent).run
-      _ <- updateTreeTextQ(t.id, t.text).run
-    } yield t.key
-
-  private def insertTreeQuestionCIO(q: Form.Tree.Question, parent: Option[Form.Tree.Key]): ConnectionIO[Form.Tree.Key] =
-    for {
-      generatedId <- insertTreeHeaderQ(q.kind, parent).withUniqueGeneratedKeys[Form.Tree.Id]("id")
-      _ <- insertTreeQuestionQ(generatedId, q.label, q.text).run
-    } yield (generatedId, q.kind)
-
-  private def updateTreeQuestionCIO(q: Form.Tree.QuestionWithKey, parent: Option[Form.Tree.Key]): ConnectionIO[Form.Tree.Key] =
-    for {
-      _ <- updateTreeHeaderQ(q.key, parent).run
-      _ <- updateTreeQuestionQ(q.id, q.label, q.text).run
-    } yield q.key
-
-  private def syncTreeRec(tree: Form.Tree, parent: Option[Form.Tree.Key]): ConnectionIO[Form.Tree.Key] = {
-    import Form.Tree._
-    tree match {
-      case g: GroupWithKey => (for {
-        updatedKey <- updateTreeGroupCIO(g, parent)
-        updatedChildrenKeys <- g.children.traverse(c => syncTreeRec(c, updatedKey.some))
-        _ <- deleteTreeChildQ(updatedKey, updatedChildrenKeys).run
-      } yield updatedKey).widen
-      case g: Group => (for {
-          createdKey <- insertTreeGroupCIO(g, parent)
-          _ <- g.children.traverse(c => syncTreeRec(c, createdKey.some))
-        } yield createdKey).widen
-      case t: TextWithKey => updateTreeTextCIO(t, parent).widen
-      case t: Text => insertTreeTextCIO(t, parent).widen
-      case q: QuestionWithKey => updateTreeQuestionCIO(q, parent).widen
-      case q: Question => insertTreeQuestionCIO(q, parent).widen
-    }
-  }
-
-  override def listByCompany(company: Company.Id, pageSize: Int, offset: Int): Result[List[Form.Record]] = byCompanyIdQ(company).to[List].toResult().transact(xa)
+  override def listByCompany(company: Company.Id, pageSize: Int, offset: Int): Result[List[Form.Record]] =
+    byCompanyIdQ(company).to[List].toResult().transact(xa)
 }
