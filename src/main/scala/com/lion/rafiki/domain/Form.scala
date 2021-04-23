@@ -1,7 +1,7 @@
 package com.lion.rafiki.domain
 
 import cats.Monad
-import cats.data.{EitherT, OptionT}
+import cats.data.EitherT
 import cats.implicits._
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.{Decoder, Encoder}
@@ -70,10 +70,10 @@ object Form {
     case class TextWithKey(id: Id, text: String) extends Tree with TreeWithKey {
       override def withKey(id: Id) = copy(id = id)
     }
-    case class Question(label: String, text: String) extends Tree{
-      override def withKey(id: Id) = QuestionWithKey(id, label, text)
+    case class Question(label: String, text: String, answers: List[Question.Answer]) extends Tree {
+      override def withKey(id: Id) = QuestionWithKey(id, label, text, answers)
     }
-    case class QuestionWithKey(id: Id, label: String, text: String) extends Tree with TreeWithKey {
+    case class QuestionWithKey(id: Tree.Id, label: String, text: String, answers: List[Question.Answer]) extends Tree with TreeWithKey {
       override def withKey(id: Id) = copy(id = id)
     }
     case class Group(children: List[Tree]) extends Tree{
@@ -83,9 +83,58 @@ object Form {
       override def withKey(id: Id) = copy(id = id)
     }
 
-    type Create = Tree
-    type Update = TreeWithKey
-    type Record = TreeWithKey
+    object Question {
+
+      sealed trait Answer {
+        def withId(id: Answer.Id): AnswerWithId
+      }
+      sealed trait AnswerWithId extends Answer {
+        val id: Answer.Id
+      }
+      object Answer {
+
+        type Id = Long @@ Answer
+        val tagSerial = tag[Answer](_: Long)
+
+        implicit val answerIdDecoder: Decoder[Id] = Decoder[Long].map(tagSerial)
+        implicit val answerIdEncoder: Encoder[Id] = Encoder[Long].contramap(_.asInstanceOf[Long])
+
+        case class FreeText(label: Option[String]) extends Answer {
+          override def withId(id: Id) = FreeTextWithId(id, label)
+        }
+        case class FreeTextWithId(id: Id, label: Option[String]) extends Answer with AnswerWithId {
+          override def withId(id: Id) = copy(id = id)
+        }
+        case class Numeric(label: Option[String], value: Int) extends Answer {
+          override def withId(id: Id) = NumericWithId(id, label, value)
+        }
+        case class NumericWithId(id: Id, label: Option[String], value: Int) extends Answer with AnswerWithId {
+          override def withId(id: Id) = copy(id = id)
+        }
+
+        implicit val questionAnswerWithIdEncoder: Encoder[AnswerWithId] = Encoder.instance {
+          case r: FreeTextWithId => r.asJson
+          case r: NumericWithId => r.asJson
+        }
+
+        implicit val questionAnswerWithIdDecoder: Decoder[AnswerWithId] = List[Decoder[AnswerWithId]](
+          Decoder[NumericWithId].widen,
+          Decoder[FreeTextWithId].widen
+        ).reduceLeft(_ or _)
+
+        implicit val questionAnswerDecoder: Decoder[Answer] = List[Decoder[Answer]](
+          Decoder[AnswerWithId].widen,
+          Decoder[Numeric].widen,
+          Decoder[FreeText].widen
+        ).reduceLeft(_ or _)
+
+        implicit val questionAnswerEncoder: Encoder[Answer] = Encoder.instance {
+          case r: AnswerWithId => r.asJson
+          case r: Numeric => r.asJson
+          case r: FreeText => r.asJson
+        }
+      }
+    }
 
     implicit val formTreeWithKeyEncoder: Encoder[TreeWithKey] = Encoder.instance {
       case r: TextWithKey => r.asJson
@@ -112,6 +161,10 @@ object Form {
       case r: Question => r.asJson
       case r: Group => r.asJson
     }
+
+    type Create = Tree
+    type Update = TreeWithKey
+    type Record = TreeWithKey
   }
 
   implicit val formIdDecoder: Decoder[Id] = Decoder[Long].map(tagSerial)

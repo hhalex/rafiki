@@ -75,6 +75,18 @@ object create {
           REFERENCES form_trees (id, kind)
           ON DELETE CASCADE
     );
+    CREATE TABLE IF NOT EXISTS form_tree_question_answers (
+       id bigint PRIMARY KEY,
+       question_id bigint NOT NULL,
+
+       label text,
+
+       num_value integer,
+
+       FOREIGN KEY question_id
+          REFERENCES form_tree_questions (id)
+          ON DELETE CASCADE
+    );
     CREATE TABLE IF NOT EXISTS form_tree_groups (
        id bigint PRIMARY KEY,
        kind
