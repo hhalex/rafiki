@@ -83,7 +83,7 @@ object create {
 
        num_value integer,
 
-       FOREIGN KEY question_id
+       FOREIGN KEY (question_id)
           REFERENCES form_tree_questions (id)
           ON DELETE CASCADE
     );
