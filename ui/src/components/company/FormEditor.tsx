@@ -240,12 +240,12 @@ const ValidatedForm = ({ initialValues, back, submit }: { initialValues: EditorD
       questions: initialValues.tree?.children || []
     }}
     validationSchema={validationSchema}
+    validateOnChange={false}
     onSubmit={(values) => {
-      console.log(JSON.stringify({...values, tree: {children: values.questions}}));
       submit({...values, questions: undefined, tree: {children: values.questions}} as any);
       back();
     }}
-  >{({ values, touched, errors, handleChange, handleBlur, isValid }) => (
+  >{({ values, touched, errors, handleChange }) => (
     <FormikForm noValidate autoComplete="off">
       <h2>{editOrAddLabel} un formulaire</h2>
       <TextField
