@@ -12,7 +12,14 @@ export namespace Form {
     
     export type Tree = Tree.Question | Tree.Group | Tree.Text;
     export namespace Tree {
-        export type Question = {label: string, text: string};
+        export namespace Question {
+            export namespace Answer {
+                export type Numeric = {label?: string, value: number};
+                export type FreeText = {label?: string};
+            }
+            export type Answer = Answer.FreeText | Answer.Numeric;
+        }
+        export type Question = {label: string, text: string, answers: Question.Answer[]};
         export type Text = {text: string};
         export type Group = {children: Tree[]};
         export type QuestionGroup = {children: Question[]};

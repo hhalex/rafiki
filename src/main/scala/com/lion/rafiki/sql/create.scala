@@ -76,7 +76,7 @@ object create {
           ON DELETE CASCADE
     );
     CREATE TABLE IF NOT EXISTS form_tree_question_answers (
-       id bigint PRIMARY KEY,
+       id bigserial PRIMARY KEY,
        question_id bigint NOT NULL,
 
        label text,

@@ -1,9 +1,9 @@
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Fab, List, ListItem, ListItemText, makeStyles, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField } from "@material-ui/core";
+import { Button, ButtonGroup, Divider, Fab, IconButton, List, ListItem, ListItemIcon, ListItemSecondaryAction, ListItemText, makeStyles, TextField } from "@material-ui/core";
 import React, { useEffect } from "react";
 import { Form } from "../../api/company/form";
 import * as Yup from "yup";
 import { Formik, Form as FormikForm, Field as FormikField, getIn, FieldArray } from "formik";
-import { Clear } from '@material-ui/icons';
+import { ArrowRightAltOutlined, Clear } from '@material-ui/icons';
 import AddIcon from '@material-ui/icons/Add';
 import { Link, Route, Switch, useHistory, useParams, useRouteMatch } from "react-router-dom";
 
@@ -38,6 +38,7 @@ type EditorData = {
   id?: string,
   name?: string,
   description?: string,
+  answers?: Form.Tree.Question.Answer[],
   tree?: Form.Tree.QuestionGroup,
 };
 
@@ -150,22 +151,41 @@ const useStylesVF = makeStyles({
       fontFamily: "monospace"
     }
   },
-  questionItem: {
-    alignItems: "flex-start",
+  questionListItem: {
     "& .qlabel": {
       width: "50px",
-      margin: "0 1em",
+      marginRight: "1em",
       "& input": {
         fontFamily: "monospace"
       }
     },
     "& .qtext": {
-      flexGrow: 6
-    },
-    "& .deleteIcon": {
-      margin: "1em",
-      cursor: "pointer"
+      flexGrow: 10
     }
+  },
+  questionItem: {
+    display: "flex"
+  },
+  
+  answersList: {
+    marginLeft: "2em",
+    borderLeft: "1px solid rgba(0, 0, 0, 0.12);",
+    
+  },
+  answerListItem: {
+    "& .avalue": {
+      width: "40px",
+      marginRight: "1em",
+      "& input": {
+        fontFamily: "monospace"
+      }
+    },
+    "& .alabel": {
+      flexGrow: 10
+    }
+  },
+  answerItem: {
+    display: "flex"
   }
 });
 
@@ -251,55 +271,117 @@ const ValidatedForm = ({ initialValues, back, submit }: { initialValues: EditorD
 
       <h3>Structure</h3>
       <FieldArray name="questions">
-        {({push, remove}) => (
-          <List className="">{
-            values.questions.map((question, i) => {
+        {questionHelper => (
+          <List>{
+            values.questions.map((question, questionIndex) => {
 
-              const label = `questions[${i}].label`;
+              const label = `questions[${questionIndex}].label`;
               const touchedLabel = getIn(touched, label);
               const errorLabel = getIn(errors, label);
 
-              const text = `questions[${i}].text`;
+              const text = `questions[${questionIndex}].text`;
               const touchedText = getIn(touched, text);
               const errorText = getIn(errors, text);
 
-              return <ListItem key={"question" + i} className={classes.questionItem} >
-                <TextField
-                  name={label}
-                  label="Label"
-                  className="qlabel"
-                  value={question.label}
-                  onChange={handleChange}
-                  error={touchedLabel && !!errorLabel}
-                  helperText={touchedLabel && errorLabel}
-                />
-                <TextField
-                  name={text}
-                  label="Question"
-                  className="qtext"
-                  multiline
-                  value={question.text}
-                  onChange={handleChange}
-                  error={touchedText && !!errorText}
-                  helperText={touchedText && errorText}
-                />
-                <Clear className="deleteIcon" onClick={() => remove(i)}/>
+              const answers = `questions[${questionIndex}].answers`;
+
+              return <ListItem key={"question" + questionIndex} className={classes.questionListItem} alignItems="flex-start">
+                <ListItemIcon>
+                  <ArrowRightAltOutlined/>
+                </ListItemIcon>
+                <ListItemText>
+                  <div className={classes.questionItem}>
+                    <TextField
+                      name={label}
+                      label="Label"
+                      className="qlabel"
+                      value={question.label}
+                      onChange={handleChange}
+                      error={touchedLabel && !!errorLabel}
+                      helperText={touchedLabel && errorLabel}
+                    />
+                    <TextField
+                      name={text}
+                      label="Question"
+                      className="qtext"
+                      multiline
+                      value={question.text}
+                      onChange={handleChange}
+                      error={touchedText && !!errorText}
+                      helperText={touchedText && errorText}
+                    />
+                  </div>
+                
+                <FieldArray name={answers}>
+                  {answerHelper => (<List className={classes.answersList}>{
+                    question.answers.map((answer: Form.Tree.Question.Answer, answerIndex: number) => {
+                      const answerLabel = `${answers}[${answerIndex}].label`;
+                      const touchedAnswerLabel = getIn(touched, answerLabel);
+                      const errorAnswerLabel = getIn(errors, answerLabel);
+
+                      const answerValue = `${answers}[${answerIndex}].value`;
+                      const touchedAnswerValue = getIn(touched, answerValue);
+                      const errorAnswerValue = getIn(errors, answerValue);
+
+                      return <ListItem key={`${answers}[${answerIndex}]`} className={classes.answerListItem} alignItems="flex-start">
+                        <ListItemText>
+                          <div className={classes.answerItem}>
+                            {"value" in answer
+                              ? <TextField
+                                  name={answerValue}
+                                  className="avalue"
+                                  type="number"
+                                  value={answer.value}
+                                  onChange={handleChange}
+                                  error={touchedAnswerValue && !!errorAnswerValue}
+                                  helperText={touchedAnswerValue && errorAnswerValue}
+                                />
+                              : null}
+                            <TextField
+                              name={answerLabel}
+                              className="alabel"
+                              value={answer.label}
+                              onChange={handleChange}
+                              error={touchedAnswerLabel && !!errorAnswerLabel}
+                              helperText={touchedAnswerLabel && errorAnswerLabel}
+                          />
+                          </div>
+                        </ListItemText>
+                        <IconButton onClick={() => answerHelper.remove(answerIndex)}>
+                          <Clear/>
+                        </IconButton>
+                      </ListItem>
+                    })
+                  }
+                    <ListItem>
+                      <ButtonGroup size="small" aria-label="small outlined button group">
+                        <Button startIcon={<AddIcon />} onClick={() => answerHelper.push({label: `Texte libre`})}>Text libre</Button>
+                        <Button startIcon={<AddIcon />} onClick={() => answerHelper.push({label: `Réponse numérique`, value: 1})}>Réponse numérique</Button>
+                      </ButtonGroup>
+                    </ListItem>
+                  </List>)}</FieldArray>
+                </ListItemText>
+
+                <IconButton onClick={() => questionHelper.remove(questionIndex)}>
+                  <Clear />
+                </IconButton>
+                
               </ListItem>
             })
           }
             <ListItem className={classes.addQuestion}>
-              <Fab
-                color="primary"
+              <Button 
+                variant="outlined" 
+                size="medium" 
+                color="primary" 
                 aria-label="add"
-                onClick={() => push({label: `q-${values.questions.length.toLocaleString("fr-FR", { minimumIntegerDigits: 3 })}`, text: ""})}
-              >
-                <AddIcon />
-              </Fab>
+                startIcon={<AddIcon />}
+                onClick={() => questionHelper.push({label: `q-${values.questions.length.toLocaleString("fr-FR", { minimumIntegerDigits: 3 })}`, text: "", answers: []})}
+              >Question</Button>
             </ListItem>
           </List>
         )}
       </FieldArray>
-
       <div className={classes.validateGroup}>
         <Button color="primary" onClick={back}>
           Annuler
