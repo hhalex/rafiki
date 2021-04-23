@@ -9,29 +9,6 @@ import { Link, Route, Switch, useHistory, useParams, useRouteMatch } from "react
 
 const useStylesCRUD = makeStyles({
   table: {},
-  formEntry: { 
-    justifyContent: "space-between",
-    "& .formEntryEdit": {
-      cursor: "pointer",
-      "&:hover": {
-        textDecoration: "underline"
-      }
-    },
-    "& > .deleteIcon": {
-      visibility: "hidden"
-    },
-    "&:hover > .deleteIcon": {
-      visibility: "visible",
-      cursor: "pointer"
-    }
-  },
-  addIcon: {
-    margin: "2em",
-    float: "right"
-  },
-  deleteIcon: {
-    cursor: "pointer",
-  }
 });
 
 type EditorData = {
@@ -80,29 +57,38 @@ const FormOverview = ({ api }: APIProps) => {
 
   useEffect(listEntries as any, []);
 
-  return <>
-    <List className={classes.table}>
-      {list.flatMap(form => ([
-        <Divider key={`divider-${form.id}`}/>,
-        <ListItem key={form.id} className={classes.formEntry} >
-          <ListItemText  primary={<Link className="formEntryEdit" to={`${url}/${form.id}`} >{form.name}</Link>} secondary={form.description}/>
-          <Clear className="deleteIcon" onClick={() => deleteEntry(form.id)} />
-        </ListItem>]
-      )).slice(1)}
-    </List>
-    <Link to={`${url}/new`} >
-      <Fab className={classes.addIcon} color="primary" aria-label="add">
-        <AddIcon />
-      </Fab>
-    </Link>
-  </>;
+  return <List className={classes.table}>
+    {list.flatMap(form => ([
+      <Divider key={`divider-${form.id}`}/>,
+      <ListItem key={form.id} button component={Link} to={`${url}/${form.id}`}>
+        <ListItemText primary={form.name} secondary={form.description}/>
+        <ListItemSecondaryAction>
+          <IconButton onClick={() => deleteEntry(form.id)}>
+            <Clear />
+          </IconButton>
+        </ListItemSecondaryAction>
+      </ListItem>]
+    )).slice(1)}
+    <ListItem key="new">
+      <Button
+        onClick={() => {}}
+        variant="outlined" 
+        size="medium" 
+        color="primary" 
+        aria-label="add"
+        startIcon={<AddIcon />}
+        component={Link}
+        to={`${url}/new`}
+      >Formulaire</Button>
+    </ListItem>
+  </List>;
 };
 
 const FormEdit = ({ api, back }: APIProps & { back: () => void }) => {
   const { id } = useParams<{ id: any }>();
   const [data, setData] = React.useState<Form.Full | undefined>(undefined);
 
-  useEffect(() => api.getById(id).then(setData) as any, []);
+  useEffect(() => api.getById(id).then(setData) as any, [data]);
 
   return data
     ? <ValidatedForm
