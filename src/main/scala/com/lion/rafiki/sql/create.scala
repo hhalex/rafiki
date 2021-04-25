@@ -113,5 +113,26 @@ object create {
     )
     """.update
 
-  val allTables = (users.run, companies.run, companyContracts.run, formTrees.run, forms.run).mapN(_ + _ + _ + _ + _)
+  val formSessions =
+    sql"""
+    CREATE TABLE IF NOT EXISTS form_sessions (
+       id                     bigserial         PRIMARY KEY,
+       company_contract_id    bigint            NOT NULL,
+       form_id                bigint            NOT NULL,
+       name                   text              NOT NULL,
+       startDate              TIMESTAMP WITH TIMEZONE,
+       endDate                TIMESTAMP WITH TIMEZONE,
+       FOREIGN KEY (company_contract_id)
+          REFERENCES company_contracts(id),
+       FOREIGN KEY (form_id)
+          REFERENCES forms(id),
+       ADD CONSTRAINT CK_start_stop
+          CHECK (
+               (startDate IS NULL AND endDate IS NULL)
+            OR (startDate IS NOT NULL AND endDate IS NULL)
+            OR (startDate IS NOT NULL AND endDate IS NOT NULL)
+          );
+    )""".update
+
+  val allTables = (users.run, companies.run, companyContracts.run, formTrees.run, forms.run, formSessions.run).mapN(_ + _ + _ + _ + _ + _)
 }
