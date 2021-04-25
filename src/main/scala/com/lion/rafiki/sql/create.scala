@@ -120,17 +120,17 @@ object create {
        company_contract_id    bigint            NOT NULL,
        form_id                bigint            NOT NULL,
        name                   text              NOT NULL,
-       startDate              TIMESTAMPTZ,
-       endDate                TIMESTAMPTZ,
+       start_date             TIMESTAMP,
+       end_date               TIMESTAMP,
        FOREIGN KEY (company_contract_id)
           REFERENCES company_contracts(id),
        FOREIGN KEY (form_id)
           REFERENCES forms(id),
        CONSTRAINT CK_start_stop
           CHECK (
-               (startDate IS NULL AND endDate IS NULL)
-            OR (startDate IS NOT NULL AND endDate IS NULL)
-            OR (startDate IS NOT NULL AND endDate IS NOT NULL)
+               (start_date IS NULL AND end_date IS NULL)
+            OR (start_date IS NOT NULL AND end_date IS NULL)
+            OR (start_date IS NOT NULL AND end_date IS NOT NULL)
           )
     )""".update
 

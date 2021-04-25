@@ -38,7 +38,7 @@ class FormCodecSpec extends Specification { def is = s2"""
 
       Form Create:
         Decode Create correctly: $correctlyDecodeFormCreate
-        """
+"""
 
   // Form tree encodings
   val correctlyEncodedGroup = Form.Tree.Group(Nil).asInstanceOf[Form.Tree].asJson.noSpaces should beEqualTo("""{"children":[]}""")
