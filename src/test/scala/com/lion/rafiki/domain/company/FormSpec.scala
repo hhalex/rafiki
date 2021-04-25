@@ -1,4 +1,4 @@
-package com.lion.rafiki.domain
+package com.lion.rafiki.domain.company
 
 import cats.implicits.catsSyntaxOptionId
 import io.circe.jawn

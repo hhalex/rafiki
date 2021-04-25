@@ -4,7 +4,8 @@ import doobie.implicits._
 import cats.implicits._
 import cats.effect.Bracket
 import cats.implicits.toFunctorOps
-import com.lion.rafiki.domain.{Company, Form, RepoError}
+import com.lion.rafiki.domain.company.Form
+import com.lion.rafiki.domain.{Company, RepoError}
 import com.lion.rafiki.sql.SQLPagination.paginate
 import doobie.{LogHandler, Transactor}
 import doobie.free.connection.ConnectionIO

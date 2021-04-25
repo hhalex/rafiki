@@ -1,11 +1,12 @@
-package com.lion.rafiki.domain
+package com.lion.rafiki.domain.company
 
 import cats.Monad
 import cats.data.EitherT
 import cats.implicits._
+import com.lion.rafiki.domain.{Company, RepoError, ValidationError, WithId}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
-import io.circe.{Decoder, Encoder}
 import io.circe.syntax.EncoderOps
+import io.circe.{Decoder, Encoder}
 import shapeless.tag
 import shapeless.tag.@@
 

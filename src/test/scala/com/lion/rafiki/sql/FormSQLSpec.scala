@@ -3,7 +3,8 @@ package com.lion.rafiki.sql
 import cats.effect.{Blocker, IO}
 import cats.implicits.catsSyntaxOptionId
 import com.lion.rafiki.Conf
-import com.lion.rafiki.domain.{Company, Form}
+import com.lion.rafiki.domain.Company
+import com.lion.rafiki.domain.company.Form
 import doobie.util.ExecutionContexts
 import doobie.util.transactor.Transactor
 import org.specs2.mutable.Specification

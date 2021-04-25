@@ -4,7 +4,8 @@ import cats.data.EitherT
 import cats.effect.Sync
 import cats.syntax.all._
 import com.lion.rafiki.auth.Role
-import com.lion.rafiki.domain.{Company, Form, User, ValidationError}
+import com.lion.rafiki.domain.company.Form
+import com.lion.rafiki.domain.{Company, User}
 import org.http4s.HttpRoutes
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl

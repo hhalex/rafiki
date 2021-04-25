@@ -3,7 +3,8 @@ package com.lion.rafiki
 import cats.effect.{Blocker, ExitCode, IO, IOApp}
 import cats.implicits.toSemigroupKOps
 import com.lion.rafiki.auth.{TokenStore, UserStore}
-import com.lion.rafiki.domain.{Company, CompanyContract, Form, User}
+import com.lion.rafiki.domain.company.Form
+import com.lion.rafiki.domain.{Company, CompanyContract, User}
 import com.lion.rafiki.endpoints.{Authentication, CompanyBusinessEndpoints, CompanyEndpoints, UserEndpoints}
 import com.lion.rafiki.sql.{DoobieCompanyContractRepo, DoobieCompanyRepo, DoobieFormRepo, DoobieUserRepo, create}
 import doobie.util.transactor.Transactor
