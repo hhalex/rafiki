@@ -24,7 +24,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         form <- EitherT.liftF(req.request.as[Form.Create])
-        result <- formService.create(form.copy(company = companyUser.id.some))
+        result <- formService.create(form, companyUser.id.some)
       } yield result
 
       action.value.flatMap({
@@ -38,13 +38,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         form <- EitherT.liftF(req.request.as[Form.Create])
-        formOwner <- formService.getById(id).map(_.data.company)
-        result <- {
-          if (formOwner.contains(companyUser.id))
-            formService.update(form.copy(company = formOwner).withId(id))
-          else
-            EitherT.leftT[F, Form.Full](ValidationError.NotAllowed: ValidationError)
-        }
+        result <- formService.update(form.withId(id), companyUser.id.some)
       } yield result
 
       action.value.flatMap {
@@ -57,14 +51,8 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     case GET -> Root / FormIdVar(id) asAuthed user => {
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        form <- formService.getById(id)
-        result <- {
-          if (form.data.company.contains(companyUser.id))
-            EitherT.rightT[F, ValidationError](form)
-          else
-            EitherT.leftT[F, Form.Full](ValidationError.NotAllowed: ValidationError)
-        }
-      } yield result
+        form <- formService.getById(id, companyUser.id.some)
+      } yield form
 
       action.value.flatMap {
         case Right(form) => Ok(form)
@@ -77,13 +65,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     case DELETE -> Root / FormIdVar(id) asAuthed user => {
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        form <- formService.getById(id)
-        _ <- {
-          if (form.data.company.contains(companyUser.id))
-            formService.delete(form.id)
-          else
-            EitherT.leftT[F, Unit](ValidationError.NotAllowed: ValidationError)
-        }
+        form <- formService.delete(id, companyUser.id.some)
       } yield form
 
       action.value.flatMap {

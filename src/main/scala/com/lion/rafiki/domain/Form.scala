@@ -199,18 +199,37 @@ object Form {
   class Service[F[_] : Monad](repo: Repo[F]) {
     type Result[T] = EitherT[F, ValidationError, T]
     // forms
-    def create(form: Create): Result[Full] = {
-      repo.create(form).leftMap(ValidationError.Repo)
+    def create(form: Create, companyId: Option[Company.Id]): Result[Full] = {
+      repo.create(form.copy(company = companyId)).leftMap(ValidationError.Repo)
     }
-    def getById(formId: Id): Result[Full] = {
-      repo.get(formId).leftMap(ValidationError.Repo)
-    }
-    def delete(formId: Id): Result[Unit] = {
-      repo.delete(formId).as(()).leftMap(ValidationError.Repo)
-    }
-    def update(form: Update): Result[Full] = {
-      repo.update(form).leftMap(ValidationError.Repo)
-    }
+    def getById(formId: Id, companyId: Option[Company.Id]): Result[Full] =
+      validateOwnership(formId, companyId)
+
+    def delete(formId: Id, companyId: Option[Company.Id]): Result[Unit] = for {
+      _ <- validateOwnership(formId, companyId)
+      _ <- repo.delete(formId).leftMap[ValidationError](ValidationError.Repo)
+    } yield ()
+
+    def validateOwnership(formId: Form.Id, companyId: Option[Company.Id]): Result[Full] = for {
+      repoForm <- repo.get(formId).leftMap(ValidationError.Repo)
+      result <- {
+        if (companyId match {
+          case Some(id) => repoForm.data.company match {
+            case Some(formCompanyOwerId) => id == formCompanyOwerId
+            case _ => false
+          }
+          case None => true
+        })
+          EitherT.rightT[F, ValidationError](repoForm)
+        else
+          EitherT.leftT[F, Form.Full](ValidationError.NotAllowed: ValidationError)
+      }} yield result
+
+    def update(form: Update, companyId: Option[Company.Id]): Result[Full] = for {
+      _ <- validateOwnership(form.id, companyId)
+      result <- repo.update(form).leftMap[ValidationError](ValidationError.Repo)
+    } yield result
+
     def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): Result[List[Record]] =
       repo.listByCompany(companyId, pageSize, offset).leftMap(ValidationError.Repo)
   }
