@@ -1,8 +1,8 @@
 val Http4sVersion = "0.21.8"
 val TsecVersion = "0.2.1"
 val FuuidVersion = "0.4.0"
-val CirceVersion = "0.13.0"
-val DoobieVersion = "0.9.0"
+val CirceVersion = "0.14.0-M5"
+val DoobieVersion = "0.13.1"
 val Specs2Version = "4.10.5"
 val LogbackVersion = "1.2.3"
 
