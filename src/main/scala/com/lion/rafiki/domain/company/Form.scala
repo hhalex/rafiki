@@ -193,20 +193,20 @@ object Form {
   }
 
   trait Validation[F[_]] {
-    def hasOwnership(formId: Form.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Unit]
+    def hasOwnership(formId: Form.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Full]
   }
 
   class FromRepoValidation[F[_]: Monad](repo: Repo[F]) extends Validation[F] {
     val notAllowed = EitherT.leftT[F, Form.Full](ValidationError.NotAllowed).leftWiden[ValidationError]
-    override def hasOwnership(formId: Form.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Unit] = for {
+    override def hasOwnership(formId: Form.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Full] = for {
       repoForm <- repo.get(formId).leftMap(ValidationError.Repo)
-      success = EitherT.rightT[F, ValidationError](())
+      success = EitherT.rightT[F, ValidationError](repoForm)
       _ <- (companyId, repoForm.data.company) match {
         case (Some(id), Some(formOwnerId)) if id == formOwnerId => success
         case (None, _) => success
         case _ => notAllowed
       }
-    } yield ()
+    } yield repoForm
   }
 
   class Service[F[_] : Monad](repo: Repo[F], validation: Validation[F]) {

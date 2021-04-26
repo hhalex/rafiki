@@ -41,6 +41,7 @@ object Main extends IOApp {
       companyRepo = new DoobieCompanyRepo[IO](xa)
       companyService = new Company.Service[IO](companyRepo, userService)
       companyContractRepo = new DoobieCompanyContractRepo[IO](xa)
+      companyContractValidation = new CompanyContract.FromRepoValidation[IO](companyContractRepo)
       companyContractService = new CompanyContract.Service[IO](companyContractRepo)
 
       formRepo = new DoobieFormRepo[IO](xa)
@@ -48,7 +49,7 @@ object Main extends IOApp {
       formService = new Form.Service[IO](formRepo, formValidation)
 
       formSessionRepo = new DoobieFormSessionRepo[IO](xa)
-      formSessionValidation = new FormSession.FromRepoValidation[IO](formSessionRepo, companyContractRepo, formValidation)
+      formSessionValidation = new FormSession.FromRepoValidation[IO](formSessionRepo, formValidation, companyContractValidation)
       formSessionService = new FormSession.Service[IO](formSessionRepo, formSessionValidation)
 
       initialUserStore = UserStore(userService, companyService, conf.hotUsersList)
@@ -66,7 +67,7 @@ object Main extends IOApp {
 
       companyEndpoints = new CompanyEndpoints[IO]().endpoints(companyService, companyContractService, routeAuth)(authorizationInfo)
       userEndpoints = new UserEndpoints[IO]().endpoints(userService, initialUserStore, routeAuth)(authorizationInfo)
-      companyBusinessEndpoints = new CompanyBusinessEndpoints[IO]().endpoints(companyService, formService, routeAuth)(authorizationInfo)
+      companyBusinessEndpoints = new CompanyBusinessEndpoints[IO]().endpoints(companyService, formService, formSessionService, routeAuth)(authorizationInfo)
 
       exitCode <- BlazeServerBuilder[IO](global)
         .bindHttp(conf.port, conf.host)

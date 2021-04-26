@@ -4,7 +4,7 @@ import doobie.implicits._
 import doobie.implicits.javasql._
 import doobie.implicits.javatimedrivernative._
 import cats.effect.Bracket
-import cats.implicits.toFunctorOps
+import cats.implicits.{toFunctorOps, toTraverseOps}
 import com.lion.rafiki.domain.Company.Id
 import com.lion.rafiki.domain.CompanyContract.Id
 import com.lion.rafiki.domain.company.{Form, FormSession}
@@ -18,6 +18,7 @@ import java.time.Instant
 
 private[sql] object FormSessionSQL {
   import CompanyContractSQL._
+  import CompanySQL._
   import FormSQL._
   implicit val formSessionIdReader: Meta[FormSession.Id] = Meta[Long].imap(FormSession.tagSerial)(_.asInstanceOf[Long])
 
@@ -37,10 +38,14 @@ private[sql] object FormSessionSQL {
     sql"""DELETE FROM form_sessions WHERE id=$id"""
       .update
 
-  val allSQL = sql"""SELECT * FROM form_sessions"""
+  val allSQL = fr"""SELECT * FROM form_sessions"""
 
   def listByCompanyContractQ(companyContractId: CompanyContract.Id, pageSize: Int, offset: Int) = paginate(pageSize: Int, offset: Int)(
     (allSQL ++ Fragments.whereAnd(fr"""company_contract_id=$companyContractId""")).query[FormSession.Record]
+  )
+
+  def listByCompanyQ(companyId: Company.Id, pageSize: Int, offset: Int) = paginate(pageSize: Int, offset: Int)(
+    sql"""SELECT fs.* FROM company_contracts cc LEFT JOIN form_sessions fs ON cc.id = fs.company_contract_id WHERE cc.company = $companyId""".query[FormSession.Record]
   )
 
   def listAllQ(pageSize: Int, offset: Int) =
@@ -79,5 +84,8 @@ class DoobieFormSessionRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F
 
   override def listByCompanyContract(companyContractId: CompanyContract.Id, pageSize: Int, offset: Int) =
     listByCompanyContractQ(companyContractId, pageSize, offset).to[List].toResult().transact(xa)
+
+  override def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int) =
+    listByCompanyQ(companyId, pageSize, offset).to[List].toResult().transact(xa)
 
 }

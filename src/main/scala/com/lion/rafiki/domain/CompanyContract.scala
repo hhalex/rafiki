@@ -2,7 +2,10 @@ package com.lion.rafiki.domain
 
 import cats.Monad
 import cats.data.EitherT
-import cats.implicits.toFunctorOps
+import cats.implicits.{toBifunctorOps, toFunctorOps}
+import com.lion.rafiki.domain
+import com.lion.rafiki.domain.company.Form
+import com.lion.rafiki.domain.company.Form.Repo
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import shapeless.tag
@@ -62,6 +65,23 @@ object CompanyContract {
     def delete(id: Id): Result[Unit]
     def list(pageSize: Int, offset: Int): Result[List[Record]]
     def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): Result[List[Record]]
+  }
+
+  trait Validation[F[_]] {
+    def hasOwnership(companyContractId: CompanyContract.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Record]
+  }
+
+  class FromRepoValidation[F[_]: Monad](repo: Repo[F]) extends Validation[F] {
+    val notAllowed = EitherT.leftT[F, Unit](ValidationError.NotAllowed).leftWiden[ValidationError]
+    override def hasOwnership(companyContractId: domain.CompanyContract.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Record] = for {
+      repoContract <- repo.get(companyContractId).leftMap(ValidationError.Repo)
+      success = EitherT.rightT[F, ValidationError](repoContract)
+      _ <- companyId match {
+        case Some(id) if id == repoContract.data.company => success
+        case Some(_) => notAllowed
+        case None => success
+      }
+    } yield repoContract
   }
 
   class Service[F[_]: Monad](companyContractRepo: Repo[F])(implicit P: PasswordHasher[F, BCrypt]) {

@@ -4,6 +4,8 @@ import cats.Monad
 import cats.data.EitherT
 import com.lion.rafiki.domain.CompanyContract.Kind
 import com.lion.rafiki.domain.{Company, CompanyContract, RepoError, ValidationError, WithId}
+import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
+import io.circe.{Decoder, Encoder}
 import shapeless.tag
 import shapeless.tag.@@
 
@@ -22,6 +24,14 @@ object FormSession {
   type Record = Update
   type Full = Update
 
+  implicit val formSessionIdDecoder: Decoder[Id] = Decoder[Long].map(tagSerial)
+  implicit val formSessionIdEncoder: Encoder[Id] = Encoder[Long].contramap(_.asInstanceOf[Long])
+
+  implicit val formSessionCreateDecoder: Decoder[Create] = deriveDecoder
+  implicit val formSessionCreateEncoder: Encoder[Create] = deriveEncoder
+  implicit val formSessionUpdateDecoder: Decoder[Update] = WithId.decoder
+  implicit val formSessionFullEncoder: Encoder[Full] = WithId.encoder
+
   trait Repo[F[_]] {
     type Result[T] = EitherT[F, RepoError, T]
     def create(formSession: Create): Result[Full]
@@ -30,19 +40,20 @@ object FormSession {
     def delete(id: Id): Result[Unit]
     def list(pageSize: Int, offset: Int): Result[List[Record]]
     def listByCompanyContract(companyContractId: CompanyContract.Id, pageSize: Int, offset: Int): Result[List[Record]]
+    def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): Result[List[Record]]
   }
 
   trait Validation[F[_]] {
-    def canCreateSession(id: CompanyContract.Id): EitherT[F, ValidationError, Unit]
-    def hasOwnership(id: FormSession.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Unit]
+    def canCreateSession(id: CompanyContract.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Unit]
+    def hasOwnership(id: FormSession.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Full]
   }
 
-  class FromRepoValidation[F[_]: Monad](repo: Repo[F], companyContractRepo: CompanyContract.Repo[F], formValidation: Form.Validation[F]) extends Validation[F] {
+  class FromRepoValidation[F[_]: Monad](repo: Repo[F], formValidation: Form.Validation[F], companyContractValidation: CompanyContract.Validation[F]) extends Validation[F] {
     val success = EitherT.rightT[F, ValidationError](())
     val contractFull = EitherT.leftT[F, Unit](ValidationError.CompanyContractFull: ValidationError)
-    override def canCreateSession(id: CompanyContract.Id) = for {
-      companyContract <- companyContractRepo.get(id).leftMap(ValidationError.Repo)
-      result <- companyContract.data.kind match {
+    override def canCreateSession(id: CompanyContract.Id, companyId: Option[Company.Id]) = for {
+      companyContract <- companyContractValidation.hasOwnership(id, companyId)
+      _ <- companyContract.data.kind match {
         case Kind.Unlimited => success
         case Kind.OneShot => repo.listByCompanyContract(id, 0, 100)
           .leftMap[ValidationError](ValidationError.Repo)
@@ -52,39 +63,37 @@ object FormSession {
           }
         case _ => contractFull
       }
-    } yield result
+    } yield ()
 
     override def hasOwnership(id: Id, companyId: Option[Company.Id]) = for {
       formSession <- repo.get(id).leftMap(ValidationError.Repo)
       _ <- formValidation.hasOwnership(formSession.data.testForm, companyId)
-    } yield ()
+    } yield formSession
   }
 
   class Service[F[_] : Monad](repo: Repo[F], validation: Validation[F]) {
     type Result[T] = EitherT[F, ValidationError, T]
 
-    def create(formSession: Create, companyContractId: CompanyContract.Id): Result[Full] = for {
-      _ <- validation.canCreateSession(companyContractId)
-      createdFormSession <- repo.create(formSession.copy(companyContractId = companyContractId)).leftMap[ValidationError](ValidationError.Repo)
+    def create(formSession: Create, companyId: Option[Company.Id]): Result[Full] = for {
+      _ <- validation.canCreateSession(formSession.companyContractId, companyId)
+      createdFormSession <- repo.create(formSession).leftMap[ValidationError](ValidationError.Repo)
     } yield createdFormSession
 
-    def getById(formId: Id, companyId: Option[Company.Id]): Result[Full] = for {
-      _ <- validation.hasOwnership(formId, companyId)
-      repoForm <- repo.get(formId).leftMap[ValidationError](ValidationError.Repo)
-    } yield repoForm
+    def getById(formSessionId: Id, companyId: Option[Company.Id]): Result[Full] =
+      validation.hasOwnership(formSessionId, companyId)
 
-    def delete(formId: Id, companyId: Option[Company.Id]): Result[Unit] = for {
-      _ <- validation.hasOwnership(formId, companyId)
-      _ <- repo.delete(formId).leftMap[ValidationError](ValidationError.Repo)
+    def delete(formSessionId: Id, companyId: Option[Company.Id]): Result[Unit] = for {
+      _ <- validation.hasOwnership(formSessionId, companyId)
+      _ <- repo.delete(formSessionId).leftMap[ValidationError](ValidationError.Repo)
     } yield ()
 
-    def update(form: Update, companyId: Option[Company.Id]): Result[Full] = for {
-      _ <- validation.hasOwnership(form.id, companyId)
-      result <- repo.update(form).leftMap[ValidationError](ValidationError.Repo)
+    def update(formSession: Update, companyId: Option[Company.Id]): Result[Full] = for {
+      _ <- validation.hasOwnership(formSession.id, companyId)
+      result <- repo.update(formSession).leftMap[ValidationError](ValidationError.Repo)
     } yield result
 
-    def listByCompanyContract(companyContractId: CompanyContract.Id, pageSize: Int, offset: Int): Result[List[Record]] =
-      repo.listByCompanyContract(companyContractId, pageSize, offset).leftMap(ValidationError.Repo)
+    def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): Result[List[Record]] =
+      repo.listByCompany(companyId, pageSize, offset).leftMap(ValidationError.Repo)
   }
 }
 
