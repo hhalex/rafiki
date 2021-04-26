@@ -1,7 +1,7 @@
 package com.lion.rafiki.domain
 
 import cats.Monad
-import cats.data.{EitherT, OptionT}
+import cats.data.EitherT
 import cats.implicits.toFunctorOps
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}

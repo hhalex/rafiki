@@ -12,5 +12,7 @@ object ValidationError {
   case object FormNotFound extends ValidationError
   case object NotAllowed extends ValidationError
 
+  case object CompanyContractFull extends ValidationError
+
   case class Repo(e: RepoError) extends ValidationError
 }

@@ -193,41 +193,40 @@ object Form {
   }
 
   trait Validation[F[_]] {
-    def doesNotExist(c: Create): EitherT[F, ValidationError, Unit]
-    def exists(c: Id): EitherT[F, ValidationError, Unit]
+    def hasOwnership(formId: Form.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Unit]
   }
 
-  class Service[F[_] : Monad](repo: Repo[F]) {
+  class FromRepoValidation[F[_]: Monad](repo: Repo[F]) extends Validation[F] {
+    val notAllowed = EitherT.leftT[F, Form.Full](ValidationError.NotAllowed).leftWiden[ValidationError]
+    override def hasOwnership(formId: Form.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Unit] = for {
+      repoForm <- repo.get(formId).leftMap(ValidationError.Repo)
+      success = EitherT.rightT[F, ValidationError](())
+      _ <- (companyId, repoForm.data.company) match {
+        case (Some(id), Some(formOwnerId)) if id == formOwnerId => success
+        case (None, _) => success
+        case _ => notAllowed
+      }
+    } yield ()
+  }
+
+  class Service[F[_] : Monad](repo: Repo[F], validation: Validation[F]) {
     type Result[T] = EitherT[F, ValidationError, T]
-    // forms
     def create(form: Create, companyId: Option[Company.Id]): Result[Full] = {
       repo.create(form.copy(company = companyId)).leftMap(ValidationError.Repo)
     }
-    def getById(formId: Id, companyId: Option[Company.Id]): Result[Full] =
-      validateOwnership(formId, companyId)
+
+    def getById(formId: Id, companyId: Option[Company.Id]): Result[Full] = for {
+      _ <- validation.hasOwnership(formId, companyId)
+      repoForm <- repo.get(formId).leftMap[ValidationError](ValidationError.Repo)
+    } yield repoForm
 
     def delete(formId: Id, companyId: Option[Company.Id]): Result[Unit] = for {
-      _ <- validateOwnership(formId, companyId)
+      _ <- validation.hasOwnership(formId, companyId)
       _ <- repo.delete(formId).leftMap[ValidationError](ValidationError.Repo)
     } yield ()
 
-    def validateOwnership(formId: Form.Id, companyId: Option[Company.Id]): Result[Full] = for {
-      repoForm <- repo.get(formId).leftMap(ValidationError.Repo)
-      result <- {
-        if (companyId match {
-          case Some(id) => repoForm.data.company match {
-            case Some(formCompanyOwerId) => id == formCompanyOwerId
-            case _ => false
-          }
-          case None => true
-        })
-          EitherT.rightT[F, ValidationError](repoForm)
-        else
-          EitherT.leftT[F, Form.Full](ValidationError.NotAllowed: ValidationError)
-      }} yield result
-
     def update(form: Update, companyId: Option[Company.Id]): Result[Full] = for {
-      _ <- validateOwnership(form.id, companyId)
+      _ <- validation.hasOwnership(form.id, companyId)
       result <- repo.update(form).leftMap[ValidationError](ValidationError.Repo)
     } yield result
 

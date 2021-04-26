@@ -3,10 +3,10 @@ package com.lion.rafiki
 import cats.effect.{Blocker, ExitCode, IO, IOApp}
 import cats.implicits.toSemigroupKOps
 import com.lion.rafiki.auth.{TokenStore, UserStore}
-import com.lion.rafiki.domain.company.Form
+import com.lion.rafiki.domain.company.{Form, FormSession}
 import com.lion.rafiki.domain.{Company, CompanyContract, User}
 import com.lion.rafiki.endpoints.{Authentication, CompanyBusinessEndpoints, CompanyEndpoints, UserEndpoints}
-import com.lion.rafiki.sql.{DoobieCompanyContractRepo, DoobieCompanyRepo, DoobieFormRepo, DoobieUserRepo, create}
+import com.lion.rafiki.sql.{DoobieCompanyContractRepo, DoobieCompanyRepo, DoobieFormRepo, DoobieFormSessionRepo, DoobieUserRepo, create}
 import doobie.util.transactor.Transactor
 import doobie.implicits._
 import org.http4s.implicits._
@@ -44,7 +44,12 @@ object Main extends IOApp {
       companyContractService = new CompanyContract.Service[IO](companyContractRepo)
 
       formRepo = new DoobieFormRepo[IO](xa)
-      formService = new Form.Service[IO](formRepo)
+      formValidation = new Form.FromRepoValidation[IO](formRepo)
+      formService = new Form.Service[IO](formRepo, formValidation)
+
+      formSessionRepo = new DoobieFormSessionRepo[IO](xa)
+      formSessionValidation = new FormSession.FromRepoValidation[IO](formSessionRepo, companyContractRepo, formValidation)
+      formSessionService = new FormSession.Service[IO](formSessionRepo, formSessionValidation)
 
       initialUserStore = UserStore(userService, companyService, conf.hotUsersList)
       tokenStore <- Stream.eval(TokenStore.empty)

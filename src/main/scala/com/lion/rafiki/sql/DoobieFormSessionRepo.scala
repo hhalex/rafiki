@@ -53,7 +53,7 @@ class DoobieFormSessionRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F
   import com.lion.rafiki.domain.RepoError.ConnectionIOwithErrors
 
   override def create(formSession: FormSession.Create): Result[FormSession.Record] =
-    insertQ(formSession.companyContract, formSession.testForm, formSession.name, formSession.startDate, formSession.endDate)
+    insertQ(formSession.companyContractId, formSession.testForm, formSession.name, formSession.startDate, formSession.endDate)
       .withUniqueGeneratedKeys[FormSession.Id]("id")
       .map(formSession.withId _)
       .toResult()
@@ -61,7 +61,7 @@ class DoobieFormSessionRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F
 
   override def update(formSession: FormSession.Update): Result[FormSession.Record] = {
     val fSession = formSession.data
-    updateQ(formSession.id, fSession.companyContract, fSession.testForm, fSession.name, fSession.startDate, fSession.endDate).run
+    updateQ(formSession.id, fSession.companyContractId, fSession.testForm, fSession.name, fSession.startDate, fSession.endDate).run
       .flatMap(_ => byIdQ(formSession.id).unique)
       .toResult()
       .transact(xa)
