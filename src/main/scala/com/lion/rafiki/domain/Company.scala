@@ -14,12 +14,8 @@ final case class Company[User](name: String, rh_user: User) {
   def withId(id: Company.Id) = WithId(id, this)
 }
 
-object Company {
-  type Id = Long @@ Company[_]
-  val tagSerial = tag[Company[_]](_: Long)
+object Company extends TaggedId[Company[_]] {
 
-  implicit val companyIdDecoder: Decoder[Id] = Decoder[Long].map(Company.tagSerial)
-  implicit val companyIdEncoder: Encoder[Id] = Encoder[Long].contramap(_.asInstanceOf[Long])
   implicit def companyDecoder[T: Decoder]: Decoder[Company[T]] = deriveDecoder
   implicit def companyEncoder[T: Encoder]: Encoder[Company[T]] = deriveEncoder
   implicit val companyCreateDecoder: Decoder[Company.Create] = deriveDecoder

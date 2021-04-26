@@ -3,7 +3,7 @@ package com.lion.rafiki.domain.company
 import cats.Monad
 import cats.data.EitherT
 import cats.implicits._
-import com.lion.rafiki.domain.{Company, RepoError, ValidationError, WithId}
+import com.lion.rafiki.domain.{Company, RepoError, TaggedId, ValidationError, WithId}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Encoder}
@@ -14,11 +14,7 @@ case class Form[T](company: Option[Company.Id], name: String, description: Optio
   def withId(id: Form.Id) = WithId(id, this)
 }
 
-object Form {
-
-  type Id = Long @@ Form[_]
-  val tagSerial = tag[Form[_]](_: Long)
-
+object Form extends TaggedId[Form[_]] {
   sealed trait Tree {
     val kind = this match {
       case _: Tree.Text | _: Tree.TextWithKey => Tree.Kind.Text
@@ -32,7 +28,7 @@ object Form {
     val key = (id, kind)
   }
 
-  object Tree {
+  object Tree extends TaggedId[Tree] {
     import io.circe.generic.auto._
 
     sealed trait Kind
@@ -59,11 +55,6 @@ object Form {
     }
 
     type Key = (Id, Kind)
-    type Id = Long @@ Tree
-    val tagSerial = tag[Tree](_: Long)
-
-    implicit val formTreeIdDecoder: Decoder[Id] = Decoder[Long].map(tagSerial)
-    implicit val formTreeIdEncoder: Encoder[Id] = Encoder[Long].contramap(_.asInstanceOf[Long])
 
     case class Text(text: String) extends Tree {
       override def withKey(id: Id) = TextWithKey(id, text)
@@ -92,13 +83,7 @@ object Form {
       sealed trait AnswerWithId extends Answer {
         val id: Answer.Id
       }
-      object Answer {
-
-        type Id = Long @@ Answer
-        val tagSerial = tag[Answer](_: Long)
-
-        implicit val answerIdDecoder: Decoder[Id] = Decoder[Long].map(tagSerial)
-        implicit val answerIdEncoder: Encoder[Id] = Encoder[Long].contramap(_.asInstanceOf[Long])
+      object Answer extends TaggedId[Answer] {
 
         case class FreeText(label: Option[String]) extends Answer {
           override def withId(id: Id) = FreeTextWithId(id, label)
@@ -168,8 +153,6 @@ object Form {
     type Record = TreeWithKey
   }
 
-  implicit val formIdDecoder: Decoder[Id] = Decoder[Long].map(tagSerial)
-  implicit val formIdEncoder: Encoder[Id] = Encoder[Long].contramap(_.asInstanceOf[Long])
   implicit def formDecoder[T: Decoder]: Decoder[Form[T]] = deriveDecoder
   implicit def formEncoder[T: Encoder]: Encoder[Form[T]] = deriveEncoder
   implicit val formCreateDecoder: Decoder[Create] = deriveDecoder

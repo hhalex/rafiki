@@ -3,9 +3,11 @@ package com.lion.rafiki.domain.company
 import cats.Monad
 import cats.data.EitherT
 import com.lion.rafiki.domain.CompanyContract.Kind
-import com.lion.rafiki.domain.{Company, CompanyContract, RepoError, TaggedId, ValidationError, WithId}
+import com.lion.rafiki.domain.{Company, CompanyContract, RepoError, ValidationError, WithId}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.{Decoder, Encoder}
+import shapeless.tag
+import shapeless.tag.@@
 
 import java.time.Instant
 
@@ -13,12 +15,17 @@ case class FormSession(companyContractId: CompanyContract.Id, testForm: Form.Id,
   def withId(id: FormSession.Id) = WithId(id, this)
 }
 
-object FormSession extends TaggedId[FormSession] {
+object FormSession {
+  type Id = Long @@ FormSession
+  val tagSerial = tag[FormSession](_: Long)
 
   type Create = FormSession
   type Update = WithId[Id, Create]
   type Record = Update
   type Full = Update
+
+  implicit val formSessionIdDecoder: Decoder[Id] = Decoder[Long].map(tagSerial)
+  implicit val formSessionIdEncoder: Encoder[Id] = Encoder[Long].contramap(_.asInstanceOf[Long])
 
   implicit val formSessionCreateDecoder: Decoder[Create] = deriveDecoder
   implicit val formSessionCreateEncoder: Encoder[Create] = deriveEncoder

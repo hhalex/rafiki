@@ -17,7 +17,7 @@ final case class CompanyContract[Company](company: Company, kind: CompanyContrac
   def withId(id: CompanyContract.Id) = WithId(id, this)
 }
 
-object CompanyContract {
+object CompanyContract extends TaggedId[CompanyContract[_]] {
   sealed trait Kind extends Product with Serializable {
     override def toString: String = this match {
       case Kind.Unlimited => "unlimited"
@@ -44,11 +44,6 @@ object CompanyContract {
     }
   }
 
-  type Id = Long @@ CompanyContract[_]
-  val tagSerial = tag[CompanyContract[_]](_: Long)
-
-  implicit val companyContractIdDecoder: Decoder[Id] = Decoder[Long].map(CompanyContract.tagSerial)
-  implicit val companyContractIdEncoder: Encoder[Id] = Encoder[Long].contramap(_.asInstanceOf[Long])
   implicit val companyContractCreateDecoder: Decoder[CreateRecord] = deriveDecoder
   implicit val companyContractCreateEncoder: Encoder[CreateRecord] = deriveEncoder
   implicit val companyContractWithIdDecoder: Decoder[Record] = WithId.decoder

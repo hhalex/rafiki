@@ -22,12 +22,8 @@ final case class User[Password](
   def withId(id: User.Id) = WithId(id, this)
 }
 
-object User {
-  type Id = Long @@ User[_]
-  val tagSerial = tag[User[_]](_: Long)
+object User extends TaggedId[User[_]] {
 
-  implicit val userIdDecoder: Decoder[Id] = Decoder[Long].map(tagSerial)
-  implicit val userIdEncoder: Encoder[Id] = Encoder[Long].contramap(_.asInstanceOf[Long])
   implicit val userPassStrEncoder: Encoder[User[PasswordHash[BCrypt]]] = Encoder.instance {
     u => Json.obj("username" -> u.username.asJson)
   }
