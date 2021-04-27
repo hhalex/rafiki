@@ -18,11 +18,14 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
   import CirceEntityEncoder._
   import Pagination._
 
+  val FormRoute = "form"
+  val SessionRoute = "session"
+
   object FormIdVar extends IdVar[Form.Id](Form.tagSerial)
   object FormSessionIdVar extends IdVar[FormSession.Id](FormSession.tagSerial)
 
   private def createFormEndpoint(companyService: Company.Service[F], formService: Form.Service[F]): AuthEndpoint[F] = {
-    case req @ POST -> Root asAuthed user =>
+    case req @ POST -> Root / FormRoute asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         form <- EitherT.liftF(req.request.as[Form.Create])
@@ -36,7 +39,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
   }
 
   private def updateFormEndpoint(companyService: Company.Service[F], formService: Form.Service[F]): AuthEndpoint[F] = {
-    case req @ PUT -> Root / FormIdVar(id) asAuthed user =>
+    case req @ PUT -> Root / FormRoute / FormIdVar(id) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         form <- EitherT.liftF(req.request.as[Form.Create])
@@ -50,7 +53,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
   }
 
   private def getFormEndpoint(companyService: Company.Service[F], formService: Form.Service[F]): AuthEndpoint[F] = {
-    case GET -> Root / FormIdVar(id) asAuthed user => {
+    case GET -> Root / FormRoute / FormIdVar(id) asAuthed user => {
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         form <- formService.getById(id, companyUser.id.some)
@@ -64,7 +67,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
   }
 
   private def deleteFormEndpoint(companyService: Company.Service[F], formService: Form.Service[F]): AuthEndpoint[F] = {
-    case DELETE -> Root / FormIdVar(id) asAuthed user => {
+    case DELETE -> Root / FormRoute / FormIdVar(id) asAuthed user => {
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         form <- formService.delete(id, companyUser.id.some)
@@ -78,7 +81,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
   }
 
   private def listFormsEndpoint(companyService: Company.Service[F], formService: Form.Service[F]): AuthEndpoint[F] = {
-    case GET -> Root :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(
+    case GET -> Root / FormRoute :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(
       offset,
     ) asAuthed user =>
       val action = for {
@@ -93,11 +96,11 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
   }
 
   private def createFormSessionEndpoint(companyService: Company.Service[F], formSessionService: FormSession.Service[F]): AuthEndpoint[F] = {
-    case req @ POST -> Root asAuthed user =>
+    case req @ POST -> Root / FormRoute / FormIdVar(formId) / SessionRoute asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         formSession <- EitherT.liftF(req.request.as[FormSession.Create])
-        result <- formSessionService.create(formSession, companyUser.id.some)
+        result <- formSessionService.create(formSession, formId, companyUser.id.some)
       } yield result
 
       action.value.flatMap({
@@ -107,7 +110,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
   }
 
   private def updateFormSessionEndpoint(companyService: Company.Service[F], formSessionService: FormSession.Service[F]): AuthEndpoint[F] = {
-    case req @ PUT -> Root / FormSessionIdVar(id) asAuthed user =>
+    case req @ PUT -> Root / SessionRoute / FormSessionIdVar(id) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         form <- EitherT.liftF(req.request.as[FormSession.Create])
@@ -121,7 +124,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
   }
 
   private def getFormSessionEndpoint(companyService: Company.Service[F], formSessionService: FormSession.Service[F]): AuthEndpoint[F] = {
-    case GET -> Root / FormSessionIdVar(id) asAuthed user => {
+    case GET -> Root / SessionRoute / FormSessionIdVar(id) asAuthed user => {
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         form <- formSessionService.getById(id, companyUser.id.some)
@@ -135,7 +138,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
   }
 
   private def deleteFormSessionEndpoint(companyService: Company.Service[F], formSessionService: FormSession.Service[F]): AuthEndpoint[F] = {
-    case DELETE -> Root / FormSessionIdVar(id) asAuthed user => {
+    case DELETE -> Root / SessionRoute / FormSessionIdVar(id) asAuthed user => {
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         form <- formSessionService.delete(id, companyUser.id.some)
@@ -149,7 +152,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
   }
 
   private def listFormSessionsEndpoint(companyService: Company.Service[F], formSessionService: FormSession.Service[F]): AuthEndpoint[F] = {
-    case GET -> Root :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(
+    case GET -> Root / SessionRoute :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(
     offset,
     ) asAuthed user =>
       val action = for {
@@ -186,9 +189,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
         .orElse(listFormSessionsEndpoint(companyService, formSessionService))
     )
 
-    Router(
-      "/form" -> auth.liftService(formEndpoints),
-      "/formsession" -> auth.liftService(formSessionEndpoints),
-    )
+     auth.liftService(formEndpoints) <+> auth.liftService(formSessionEndpoints)
+
   }
 }

@@ -37,15 +37,16 @@ object FormSession extends TaggedId[FormSession] {
   }
 
   trait Validation[F[_]] {
-    def canCreateSession(id: CompanyContract.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Unit]
+    def canCreateSession(id: CompanyContract.Id, formId: Form.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Unit]
     def hasOwnership(id: FormSession.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Full]
   }
 
   class FromRepoValidation[F[_]: Monad](repo: Repo[F], formValidation: Form.Validation[F], companyContractValidation: CompanyContract.Validation[F]) extends Validation[F] {
     val success = EitherT.rightT[F, ValidationError](())
     val contractFull = EitherT.leftT[F, Unit](ValidationError.CompanyContractFull: ValidationError)
-    override def canCreateSession(id: CompanyContract.Id, companyId: Option[Company.Id]) = for {
+    override def canCreateSession(id: CompanyContract.Id, formId: Form.Id, companyId: Option[Company.Id]) = for {
       companyContract <- companyContractValidation.hasOwnership(id, companyId)
+      _ <- formValidation.hasOwnership(formId, companyId)
       _ <- companyContract.data.kind match {
         case Kind.Unlimited => success
         case Kind.OneShot => repo.listByCompanyContract(id, 0, 100)
@@ -67,9 +68,9 @@ object FormSession extends TaggedId[FormSession] {
   class Service[F[_] : Monad](repo: Repo[F], validation: Validation[F]) {
     type Result[T] = EitherT[F, ValidationError, T]
 
-    def create(formSession: Create, companyId: Option[Company.Id]): Result[Full] = for {
-      _ <- validation.canCreateSession(formSession.companyContractId, companyId)
-      createdFormSession <- repo.create(formSession).leftMap[ValidationError](ValidationError.Repo)
+    def create(formSession: Create, formId: Form.Id, companyId: Option[Company.Id]): Result[Full] = for {
+      _ <- validation.canCreateSession(formSession.companyContractId, formId, companyId)
+      createdFormSession <- repo.create(formSession.copy(testForm = formId)).leftMap[ValidationError](ValidationError.Repo)
     } yield createdFormSession
 
     def getById(formSessionId: Id, companyId: Option[Company.Id]): Result[Full] =
