@@ -134,5 +134,18 @@ object create {
           )
     )""".update
 
-  val allTables = (users.run, companies.run, companyContracts.run, formTrees.run, forms.run, formSessions.run).mapN(_ + _ + _ + _ + _ + _)
+  val formSessionInvites =
+    sql"""
+    CREATE TABLE IF NOT EXISTS form_session_invites (
+       id                     bigserial         PRIMARY KEY,
+       form_session_id        bigint            NOT NULL,
+       user_id                bigint            NOT NULL,
+       accept_conditions      boolean,
+       FOREIGN KEY (form_session_id)
+          REFERENCES form_sessions(id),
+       FOREIGN KEY (user_id)
+          REFERENCES users(id)
+    )""".update
+
+  val allTables = (users.run, companies.run, companyContracts.run, formTrees.run, forms.run, formSessions.run, formSessionInvites.run).mapN(_ + _ + _ + _ + _ + _ + _)
 }

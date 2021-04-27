@@ -24,7 +24,7 @@ final case class User[Password](
 
 object User extends TaggedId[User[_]] {
 
-  implicit val userPassStrEncoder: Encoder[User[PasswordHash[BCrypt]]] = Encoder.instance {
+  implicit def userPassStrEncoder[T]: Encoder[User[T]] = Encoder.instance {
     u => Json.obj("username" -> u.username.asJson)
   }
   implicit val userCreateDecoder: Decoder[User.Create] = deriveDecoder
