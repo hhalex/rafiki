@@ -5,7 +5,7 @@ import cats.effect.Sync
 import cats.syntax.all._
 import com.lion.rafiki.auth.Role
 import com.lion.rafiki.domain.company.{Form, FormSession, FormSessionInvite}
-import com.lion.rafiki.domain.{Company, User, ValidationError}
+import com.lion.rafiki.domain.{Company, CompanyContract, User, ValidationError}
 import org.http4s.HttpRoutes
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
@@ -86,7 +86,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
         case Left(err) => BadRequest(s"Error '$err' while listing forms.")
       })
       // Create session of a form
-    case req @ POST -> Root / FormIdVar(formId) / "session" asAuthed user =>
+    case req @ POST -> Root / FormIdVar(formId) / SessionRoute asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         formSession <- req.request.attemptAs[FormSession.Create].leftMap(ValidationError.Decoding)
@@ -104,7 +104,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     case req @ PUT -> Root / FormSessionIdVar(id) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        form <- req.request.attemptAs[FormSession.Create].leftMap(ValidationError.Decoding)
+        form <- req.request.attemptAs[FormSession].leftMap(ValidationError.Decoding)
         result <- formSessionService.update(form.withId(id), companyUser.id)
       } yield result
 
@@ -163,7 +163,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     case GET -> Root / FormSessionIdVar(formSessionId) / InviteRoute :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(offset) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        invites <- formSessionInviteService.listByFormSession(formSessionId, pageSize.getOrElse(10), offset.getOrElse(0))
+        invites <- formSessionInviteService.listByFormSession(formSessionId, companyUser.id, pageSize.getOrElse(10), offset.getOrElse(0))
       } yield invites
 
       action.value.flatMap({

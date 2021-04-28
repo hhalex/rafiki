@@ -5,7 +5,6 @@ import doobie.implicits.javasql._
 import doobie.implicits.javatimedrivernative._
 import cats.effect.Bracket
 import cats.implicits.toFunctorOps
-import com.lion.rafiki.domain
 import com.lion.rafiki.domain.company.{Form, FormSession}
 import com.lion.rafiki.domain.{Company, CompanyContract}
 import com.lion.rafiki.sql.SQLPagination.paginate
@@ -13,7 +12,7 @@ import doobie.{Fragments, LogHandler, Transactor}
 import doobie.implicits.toSqlInterpolator
 import doobie.util.meta.Meta
 
-import java.time.Instant
+import java.time.LocalDateTime
 
 private[sql] object FormSessionSQL {
   import CompanyContractSQL.companyContractIdMeta
@@ -24,14 +23,14 @@ private[sql] object FormSessionSQL {
   implicit val han = LogHandler.jdkLogHandler
 
   def byIdQ(id: FormSession.Id) =
-    sql"""SELECT * FROM form_sessions WHERE id=$id""".query[FormSession.Record]
+    sql"""SELECT id, form_id, name, start_date, end_date FROM form_sessions WHERE id=$id""".query[FormSession.Record]
 
-  def insertQ(companyContractId: CompanyContract.Id, formId: Form.Id, name: String, startDate: Option[Instant], endDate: Option[Instant]) =
+  def insertQ(companyContractId: CompanyContract.Id, formId: Form.Id, name: String, startDate: Option[LocalDateTime], endDate: Option[LocalDateTime]) =
     sql"""INSERT INTO form_sessions (company_contract_id, form_id, name, start_date, end_date) VALUES ($companyContractId, $formId, $name, $startDate, $endDate)"""
       .update
 
-  def updateQ(id: FormSession.Id, companyContractId: CompanyContract.Id, formId: Form.Id, name: String, startDate: Option[Instant], endDate: Option[Instant]) = {
-    sql"UPDATE form_sessions SET company_contract_id=$companyContractId, form_id=$formId, name=$name, start_date=$startDate, end_date=$endDate WHERE id=$id"
+  def updateQ(id: FormSession.Id, formId: Form.Id, name: String, startDate: Option[LocalDateTime], endDate: Option[LocalDateTime]) = {
+    sql"UPDATE form_sessions SET form_id=$formId, name=$name, start_date=$startDate, end_date=$endDate WHERE id=$id"
       .update
   }
 
@@ -39,7 +38,7 @@ private[sql] object FormSessionSQL {
     sql"""DELETE FROM form_sessions WHERE id=$id"""
       .update
 
-  val allSQL = fr"""SELECT * FROM form_sessions"""
+  val allSQL = fr"""SELECT id, form_id, name, start_date, end_date FROM form_sessions"""
 
   def getByCompanyContractQ(companyContractId: CompanyContract.Id) = (allSQL ++ Fragments.whereAnd(fr"""company_contract_id=$companyContractId""")).query[FormSession.Record]
 
@@ -47,7 +46,7 @@ private[sql] object FormSessionSQL {
     paginate(pageSize: Int, offset: Int)(getByCompanyContractQ(companyContractId))
 
   def listByCompanyQ(companyId: Company.Id, pageSize: Int, offset: Int) = paginate(pageSize: Int, offset: Int)(
-    sql"""SELECT fs.* FROM company_contracts cc LEFT JOIN form_sessions fs ON cc.id = fs.company_contract_id WHERE cc.company = $companyId""".query[FormSession.Record]
+    sql"""SELECT fs.id, fs.form_id, fs.name, fs.start_date, fs.end_date FROM form_sessions fs LEFT JOIN company_contracts cc ON cc.id = fs.company_contract_id WHERE cc.company = $companyId""".query[FormSession.Record]
   )
 
   def listAllQ(pageSize: Int, offset: Int) =
@@ -59,8 +58,8 @@ class DoobieFormSessionRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F
   import FormSessionSQL._
   import com.lion.rafiki.domain.RepoError.ConnectionIOwithErrors
 
-  override def create(formSession: FormSession.Create): Result[FormSession.Record] =
-    insertQ(formSession.companyContractId, formSession.formId, formSession.name, formSession.startDate, formSession.endDate)
+  override def create(formSession: FormSession.Create, companyContractId: CompanyContract.Id): Result[FormSession.Record] =
+    insertQ(companyContractId, formSession.formId, formSession.name, formSession.startDate, formSession.endDate)
       .withUniqueGeneratedKeys[FormSession.Id]("id")
       .map(formSession.withId _)
       .toResult()
@@ -68,7 +67,7 @@ class DoobieFormSessionRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F
 
   override def update(formSession: FormSession.Update): Result[FormSession.Record] = {
     val fSession = formSession.data
-    updateQ(formSession.id, fSession.companyContractId, fSession.formId, fSession.name, fSession.startDate, fSession.endDate).run
+    updateQ(formSession.id, fSession.formId, fSession.name, fSession.startDate, fSession.endDate).run
       .flatMap(_ => byIdQ(formSession.id).unique)
       .toResult()
       .transact(xa)

@@ -35,7 +35,7 @@ object FormSessionSQLSpec extends Specification with IOChecker {
 
   check(byIdQ(formSessionId))
   check(insertQ(companyContractId, formId, "name", None, None))
-  check(updateQ(formSessionId, companyContractId, formId, "name", None, None))
+  check(updateQ(formSessionId, formId, "name", None, None))
   check(deleteQ(formSessionId))
   check(listAllQ(10, 10))
   check(listByCompanyQ(companyId, 10, 10))

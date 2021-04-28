@@ -54,7 +54,7 @@ object Main extends IOApp {
 
       formSessionInviteRepo = new DoobieFormSessionInviteRepo[IO](xa)
       formSessionInviteValidation = new FormSessionInvite.FromRepoValidation[IO](formSessionInviteRepo, formSessionValidation)
-      formSessionInviteService = new FormSessionInvite.Service[IO](formSessionInviteRepo, formSessionInviteValidation, userService)
+      formSessionInviteService = new FormSessionInvite.Service[IO](formSessionInviteRepo, formSessionInviteValidation, formSessionValidation, userService)
 
       initialUserStore = UserStore(userService, companyService, conf.hotUsersList)
       tokenStore <- Stream.eval(TokenStore.empty)

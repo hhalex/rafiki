@@ -8,9 +8,9 @@ import com.lion.rafiki.domain.{Company, CompanyContract, RepoError, TaggedId, Va
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.{Decoder, Encoder}
 
-import java.time.Instant
+import java.time.LocalDateTime
 
-case class FormSession(companyContractId: CompanyContract.Id, formId: Form.Id, name: String, startDate: Option[Instant], endDate: Option[Instant]) {
+case class FormSession(formId: Form.Id, name: String, startDate: Option[LocalDateTime], endDate: Option[LocalDateTime]) {
   def withId(id: FormSession.Id) = WithId(id, this)
 }
 
@@ -28,7 +28,7 @@ object FormSession extends TaggedId[FormSession] {
 
   trait Repo[F[_]] {
     type Result[T] = EitherT[F, RepoError, T]
-    def create(formSession: Create): Result[Full]
+    def create(formSession: Create, companyContract: CompanyContract.Id): Result[Full]
     def update(formSession: Update): Result[Full]
     def get(id: Id): Result[Full]
     def getByCompanyContract(companyContractId: CompanyContract.Id): Result[List[Record]]
@@ -80,7 +80,7 @@ object FormSession extends TaggedId[FormSession] {
 
     def create(formSession: Create, formId: Form.Id, companyId: Company.Id): Result[Full] = for {
       contract <- validation.canCreateSession(formId, companyId)
-      createdFormSession <- repo.create(formSession.copy(formId = formId, companyContractId = contract.id)).leftMap[ValidationError](ValidationError.Repo)
+      createdFormSession <- repo.create(formSession.copy(formId = formId), contract.id).leftMap[ValidationError](ValidationError.Repo)
     } yield createdFormSession
 
     def getById(formSessionId: Id, companyId: Company.Id): Result[Full] =
