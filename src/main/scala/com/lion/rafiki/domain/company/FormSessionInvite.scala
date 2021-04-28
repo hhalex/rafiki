@@ -1,7 +1,8 @@
 package com.lion.rafiki.domain.company
 
+import cats.Monad
 import cats.data.EitherT
-import com.lion.rafiki.domain.{RepoError, TaggedId, User, WithId}
+import com.lion.rafiki.domain.{Company, RepoError, TaggedId, User, ValidationError, WithId}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.{Decoder, Encoder}
 
@@ -14,8 +15,8 @@ object FormSessionInvite extends TaggedId[FormSessionInvite[_]] {
 
   type Create = FormSessionInvite[User.Create]
   type CreateRecord = FormSessionInvite[User.Id]
-  type Update = WithId[Id, FormSessionInvite[User.Update]]
-  type Record = WithId[Id, FormSessionInvite[User.Id]]
+  type Update = WithId[Id, Create]
+  type Record = WithId[Id, CreateRecord]
   type UpdateRecord = Record
   type Full = WithId[Id, FormSessionInvite[User.Full]]
 
@@ -30,12 +31,60 @@ object FormSessionInvite extends TaggedId[FormSessionInvite[_]] {
   trait Repo[F[_]] {
     type Result[T] = EitherT[F, RepoError, T]
     def create(formSessionInvite: CreateRecord): Result[Record]
-    def update(formSessionInvite: UpdateRecord): Result[Record]
-    def get(id: Id): Result[Record]
-    def getByFormSession(id: FormSession.Id): Result[List[Record]]
+    def update(formSessionInvite: UpdateRecord): Result[Full]
+    def get(id: Id): Result[Full]
+    def getByFormSession(id: FormSession.Id): Result[List[Full]]
     def delete(id: Id): Result[Unit]
-    def list(pageSize: Int, offset: Int): Result[List[Record]]
-    def listByFormSession(formSessionId: FormSession.Id, pageSize: Int, offset: Int): Result[List[Record]]
+    def list(pageSize: Int, offset: Int): Result[List[Full]]
+    def listByFormSession(formSessionId: FormSession.Id, pageSize: Int, offset: Int): Result[List[Full]]
+  }
+
+  trait Validation[F[_]] {
+    def canCreateSessionInvite(formId: FormSession.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, FormSession.Full]
+    def hasOwnership(id: FormSessionInvite.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Full]
+  }
+
+  class FromRepoValidation[F[_]: Monad](repo: Repo[F], formSessionValidation: FormSession.Validation[F]) extends Validation[F] {
+    val success = EitherT.rightT[F, ValidationError](())
+    val contractFull = EitherT.leftT[F, Unit](ValidationError.CompanyContractFull: ValidationError)
+    override def canCreateSessionInvite(formId: FormSession.Id, companyId: Option[Company.Id]) =
+      formSessionValidation.hasOwnership(formId, companyId)
+
+    override def hasOwnership(id: Id, companyId: Option[Company.Id]) = for {
+      formSessionInvite <- repo.get(id).leftMap(ValidationError.Repo)
+      _ <- formSessionValidation.hasOwnership(formSessionInvite.data.formSession, companyId)
+    } yield formSessionInvite
+  }
+
+  class Service[F[_] : Monad](repo: Repo[F], validation: Validation[F], userService: User.Service[F]) {
+    type Result[T] = EitherT[F, ValidationError, T]
+
+    def create(formSessionInvite: Create, formSessionId: FormSession.Id, companyId: Option[Company.Id]): Result[Full] = for {
+      _ <- validation.canCreateSessionInvite(formSessionId, companyId)
+      user <- userService.getByName(formSessionInvite.user.username)
+        .orElse(userService.create(formSessionInvite.user))
+      createdFormSessionInvite <- repo.create(formSessionInvite.copy(formSession = formSessionId, user = user.id))
+        .leftMap[ValidationError](ValidationError.Repo)
+    } yield createdFormSessionInvite.mapData(_.copy(user = user))
+
+    def getById(formSessionInviteId: Id, companyId: Option[Company.Id]): Result[Full] =
+      validation.hasOwnership(formSessionInviteId, companyId)
+
+    def delete(formSessionInviteId: Id, companyId: Option[Company.Id]): Result[Unit] = for {
+      _ <- validation.hasOwnership(formSessionInviteId, companyId)
+      _ <- repo.delete(formSessionInviteId).leftMap[ValidationError](ValidationError.Repo)
+    } yield ()
+
+    def update(formSessionInvite: Update, companyId: Option[Company.Id]): Result[Full] = for {
+      _ <- validation.hasOwnership(formSessionInvite.id, companyId)
+      user <- userService.getByName(formSessionInvite.data.user.username)
+        .orElse(userService.create(formSessionInvite.data.user))
+      result <- repo.update(formSessionInvite.mapData(_.copy(user = user.id)))
+        .leftMap[ValidationError](ValidationError.Repo)
+    } yield result
+
+    def listByFormSession(formSessionId: FormSession.Id, pageSize: Int, offset: Int): Result[List[Full]] =
+      repo.listByFormSession(formSessionId, pageSize, offset).leftMap(ValidationError.Repo)
   }
 }
 

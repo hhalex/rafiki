@@ -144,7 +144,8 @@ object create {
        FOREIGN KEY (form_session_id)
           REFERENCES form_sessions(id),
        FOREIGN KEY (user_id)
-          REFERENCES users(id)
+          REFERENCES users(id),
+       UNIQUE(form_session_id, user_id)
     )""".update
 
   val allTables = (users.run, companies.run, companyContracts.run, formTrees.run, forms.run, formSessions.run, formSessionInvites.run).mapN(_ + _ + _ + _ + _ + _ + _)

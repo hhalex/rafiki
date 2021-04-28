@@ -3,10 +3,10 @@ package com.lion.rafiki
 import cats.effect.{Blocker, ExitCode, IO, IOApp}
 import cats.implicits.toSemigroupKOps
 import com.lion.rafiki.auth.{TokenStore, UserStore}
-import com.lion.rafiki.domain.company.{Form, FormSession}
+import com.lion.rafiki.domain.company.{Form, FormSession, FormSessionInvite}
 import com.lion.rafiki.domain.{Company, CompanyContract, User}
 import com.lion.rafiki.endpoints.{Authentication, CompanyBusinessEndpoints, CompanyEndpoints, UserEndpoints}
-import com.lion.rafiki.sql.{DoobieCompanyContractRepo, DoobieCompanyRepo, DoobieFormRepo, DoobieFormSessionRepo, DoobieUserRepo, create}
+import com.lion.rafiki.sql.{DoobieCompanyContractRepo, DoobieCompanyRepo, DoobieFormRepo, DoobieFormSessionInviteRepo, DoobieFormSessionRepo, DoobieUserRepo, create}
 import doobie.util.transactor.Transactor
 import doobie.implicits._
 import org.http4s.implicits._
@@ -52,6 +52,10 @@ object Main extends IOApp {
       formSessionValidation = new FormSession.FromRepoValidation[IO](formSessionRepo, formValidation, companyContractValidation)
       formSessionService = new FormSession.Service[IO](formSessionRepo, formSessionValidation)
 
+      formSessionInviteRepo = new DoobieFormSessionInviteRepo[IO](xa)
+      formSessionInviteValidation = new FormSessionInvite.FromRepoValidation[IO](formSessionInviteRepo, formSessionValidation)
+      formSessionInviteService = new FormSessionInvite.Service[IO](formSessionInviteRepo, formSessionInviteValidation, userService)
+
       initialUserStore = UserStore(userService, companyService, conf.hotUsersList)
       tokenStore <- Stream.eval(TokenStore.empty)
 
@@ -67,7 +71,7 @@ object Main extends IOApp {
 
       companyEndpoints = new CompanyEndpoints[IO]().endpoints(companyService, companyContractService, routeAuth)(authorizationInfo)
       userEndpoints = new UserEndpoints[IO]().endpoints(userService, initialUserStore, routeAuth)(authorizationInfo)
-      companyBusinessEndpoints = new CompanyBusinessEndpoints[IO]().endpoints(companyService, formService, formSessionService, routeAuth)(authorizationInfo)
+      companyBusinessEndpoints = new CompanyBusinessEndpoints[IO]().endpoints(companyService, formService, formSessionService, formSessionInviteService, routeAuth)(authorizationInfo)
 
       exitCode <- BlazeServerBuilder[IO](global)
         .bindHttp(conf.port, conf.host)
