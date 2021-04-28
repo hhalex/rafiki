@@ -7,8 +7,6 @@ import com.lion.rafiki.domain.{Company, RepoError, TaggedId, ValidationError, Wi
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Encoder}
-import shapeless.tag
-import shapeless.tag.@@
 
 case class Form[T](company: Option[Company.Id], name: String, description: Option[String], tree: Option[T]) {
   def withId(id: Form.Id) = WithId(id, this)
@@ -209,8 +207,8 @@ object Form extends TaggedId[Form[_]] {
     } yield ()
 
     def update(form: Update, companyId: Option[Company.Id]): Result[Full] = for {
-      _ <- validation.hasOwnership(form.id, companyId)
-      result <- repo.update(form).leftMap[ValidationError](ValidationError.Repo)
+      formDB <- validation.hasOwnership(form.id, companyId)
+      result <- repo.update(form.mapData(_.copy(company = formDB.data.company))).leftMap[ValidationError](ValidationError.Repo)
     } yield result
 
     def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): Result[List[Record]] =

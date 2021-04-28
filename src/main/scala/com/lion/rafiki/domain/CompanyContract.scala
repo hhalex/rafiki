@@ -57,6 +57,7 @@ object CompanyContract extends TaggedId[CompanyContract[_]] {
     def create(c: CreateRecord): Result[Record]
     def update(c: Record): Result[Record]
     def get(id: Id): Result[Record]
+    def getByCompany(companyId: Company.Id): Result[List[Record]]
     def delete(id: Id): Result[Unit]
     def list(pageSize: Int, offset: Int): Result[List[Record]]
     def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int): Result[List[Record]]

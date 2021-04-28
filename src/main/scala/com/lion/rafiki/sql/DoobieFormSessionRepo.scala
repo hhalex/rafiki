@@ -5,10 +5,11 @@ import doobie.implicits.javasql._
 import doobie.implicits.javatimedrivernative._
 import cats.effect.Bracket
 import cats.implicits.toFunctorOps
+import com.lion.rafiki.domain
 import com.lion.rafiki.domain.company.{Form, FormSession}
 import com.lion.rafiki.domain.{Company, CompanyContract}
 import com.lion.rafiki.sql.SQLPagination.paginate
-import doobie.{Fragments, Transactor}
+import doobie.{Fragments, LogHandler, Transactor}
 import doobie.implicits.toSqlInterpolator
 import doobie.util.meta.Meta
 
@@ -19,6 +20,8 @@ private[sql] object FormSessionSQL {
   import CompanySQL.companyIdReader
   import FormSQL._
   implicit val formSessionIdReader: Meta[FormSession.Id] = Meta[Long].imap(FormSession.tagSerial)(_.asInstanceOf[Long])
+
+  implicit val han = LogHandler.jdkLogHandler
 
   def byIdQ(id: FormSession.Id) =
     sql"""SELECT * FROM form_sessions WHERE id=$id""".query[FormSession.Record]
@@ -38,9 +41,10 @@ private[sql] object FormSessionSQL {
 
   val allSQL = fr"""SELECT * FROM form_sessions"""
 
-  def listByCompanyContractQ(companyContractId: CompanyContract.Id, pageSize: Int, offset: Int) = paginate(pageSize: Int, offset: Int)(
-    (allSQL ++ Fragments.whereAnd(fr"""company_contract_id=$companyContractId""")).query[FormSession.Record]
-  )
+  def getByCompanyContractQ(companyContractId: CompanyContract.Id) = (allSQL ++ Fragments.whereAnd(fr"""company_contract_id=$companyContractId""")).query[FormSession.Record]
+
+  def listByCompanyContractQ(companyContractId: CompanyContract.Id, pageSize: Int, offset: Int) =
+    paginate(pageSize: Int, offset: Int)(getByCompanyContractQ(companyContractId))
 
   def listByCompanyQ(companyId: Company.Id, pageSize: Int, offset: Int) = paginate(pageSize: Int, offset: Int)(
     sql"""SELECT fs.* FROM company_contracts cc LEFT JOIN form_sessions fs ON cc.id = fs.company_contract_id WHERE cc.company = $companyId""".query[FormSession.Record]
@@ -56,7 +60,7 @@ class DoobieFormSessionRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F
   import com.lion.rafiki.domain.RepoError.ConnectionIOwithErrors
 
   override def create(formSession: FormSession.Create): Result[FormSession.Record] =
-    insertQ(formSession.companyContractId, formSession.testForm, formSession.name, formSession.startDate, formSession.endDate)
+    insertQ(formSession.companyContractId, formSession.formId, formSession.name, formSession.startDate, formSession.endDate)
       .withUniqueGeneratedKeys[FormSession.Id]("id")
       .map(formSession.withId _)
       .toResult()
@@ -64,7 +68,7 @@ class DoobieFormSessionRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F
 
   override def update(formSession: FormSession.Update): Result[FormSession.Record] = {
     val fSession = formSession.data
-    updateQ(formSession.id, fSession.companyContractId, fSession.testForm, fSession.name, fSession.startDate, fSession.endDate).run
+    updateQ(formSession.id, fSession.companyContractId, fSession.formId, fSession.name, fSession.startDate, fSession.endDate).run
       .flatMap(_ => byIdQ(formSession.id).unique)
       .toResult()
       .transact(xa)
@@ -86,4 +90,6 @@ class DoobieFormSessionRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F
   override def listByCompany(companyId: Company.Id, pageSize: Int, offset: Int) =
     listByCompanyQ(companyId, pageSize, offset).to[List].toResult().transact(xa)
 
+  override def getByCompanyContract(companyContractId: CompanyContract.Id) =
+    getByCompanyContractQ(companyContractId).to[List].toResult().transact(xa)
 }

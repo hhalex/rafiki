@@ -4,6 +4,7 @@ import doobie.implicits._
 import cats.data.OptionT
 import cats.effect.Bracket
 import cats.implicits.toFunctorOps
+import com.lion.rafiki.domain
 import com.lion.rafiki.domain.{Company, CompanyContract}
 import com.lion.rafiki.sql.SQLPagination.paginate
 import doobie.Transactor
@@ -19,7 +20,7 @@ private[sql] object CompanyContractSQL {
     sql"""SELECT * FROM company_contracts WHERE id=$id""".query[CompanyContract.Record]
 
   def byCompanyIdQ(id: Company.Id) =
-    sql"""SELECT * FROM company_contracts WHERE company=$id""".query[CompanyContract.Record]
+    sql"""SELECT * FROM company_contracts WHERE company=$id ORDER BY id ASC""".query[CompanyContract.Record]
 
   def insertQ(company: Company.Id, kind: CompanyContract.Kind) =
     sql"""INSERT INTO company_contracts (company,kind) VALUES ($company,$kind)"""
@@ -62,6 +63,9 @@ class DoobieCompanyContractRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transact
 
   override def get(id: CompanyContract.Id): Result[CompanyContract.Record] = byIdQ(id).unique.toResult().transact(xa)
 
+  override def getByCompany(companyId: Company.Id): Result[List[CompanyContract.Record]] =
+    byCompanyIdQ(companyId).to[List].toResult().transact(xa)
+
   override def delete(id: CompanyContract.Id): Result[Unit] = byIdQ(id).unique
     .flatMap(_ => deleteQ(id).run.as(()))
     .toResult()
@@ -71,5 +75,5 @@ class DoobieCompanyContractRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transact
     listAllQ(pageSize: Int, offset: Int).to[List].toResult().transact(xa)
 
   override def listByCompany(id: Company.Id, pageSize: Int, offset: Int): Result[List[CompanyContract.Record]] =
-    byCompanyIdQ(id).to[List].toResult().transact(xa)
+    listByCompanyQ(id, pageSize, offset).to[List].toResult().transact(xa)
 }

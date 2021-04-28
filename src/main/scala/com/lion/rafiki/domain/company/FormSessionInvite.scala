@@ -2,10 +2,10 @@ package com.lion.rafiki.domain.company
 
 import cats.Monad
 import cats.data.EitherT
+import cats.implicits.catsSyntaxOptionId
 import com.lion.rafiki.domain.{Company, RepoError, TaggedId, User, ValidationError, WithId}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.{Decoder, Encoder}
-
 
 case class FormSessionInvite[User](formSession: FormSession.Id, user: User, acceptConditions: Option[Boolean]) {
   def withId(id: FormSessionInvite.Id) = WithId(id, this)
@@ -40,17 +40,17 @@ object FormSessionInvite extends TaggedId[FormSessionInvite[_]] {
   }
 
   trait Validation[F[_]] {
-    def canCreateSessionInvite(formId: FormSession.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, FormSession.Full]
-    def hasOwnership(id: FormSessionInvite.Id, companyId: Option[Company.Id]): EitherT[F, ValidationError, Full]
+    def canCreateSessionInvite(formId: FormSession.Id, companyId: Company.Id): EitherT[F, ValidationError, FormSession.Full]
+    def hasOwnership(id: FormSessionInvite.Id, companyId: Company.Id): EitherT[F, ValidationError, Full]
   }
 
   class FromRepoValidation[F[_]: Monad](repo: Repo[F], formSessionValidation: FormSession.Validation[F]) extends Validation[F] {
     val success = EitherT.rightT[F, ValidationError](())
     val contractFull = EitherT.leftT[F, Unit](ValidationError.CompanyContractFull: ValidationError)
-    override def canCreateSessionInvite(formId: FormSession.Id, companyId: Option[Company.Id]) =
+    override def canCreateSessionInvite(formId: FormSession.Id, companyId: Company.Id) =
       formSessionValidation.hasOwnership(formId, companyId)
 
-    override def hasOwnership(id: Id, companyId: Option[Company.Id]) = for {
+    override def hasOwnership(id: Id, companyId: Company.Id) = for {
       formSessionInvite <- repo.get(id).leftMap(ValidationError.Repo)
       _ <- formSessionValidation.hasOwnership(formSessionInvite.data.formSession, companyId)
     } yield formSessionInvite
@@ -59,7 +59,7 @@ object FormSessionInvite extends TaggedId[FormSessionInvite[_]] {
   class Service[F[_] : Monad](repo: Repo[F], validation: Validation[F], userService: User.Service[F]) {
     type Result[T] = EitherT[F, ValidationError, T]
 
-    def create(formSessionInvite: Create, formSessionId: FormSession.Id, companyId: Option[Company.Id]): Result[Full] = for {
+    def create(formSessionInvite: Create, formSessionId: FormSession.Id, companyId: Company.Id): Result[Full] = for {
       _ <- validation.canCreateSessionInvite(formSessionId, companyId)
       user <- userService.getByName(formSessionInvite.user.username)
         .orElse(userService.create(formSessionInvite.user))
@@ -67,15 +67,15 @@ object FormSessionInvite extends TaggedId[FormSessionInvite[_]] {
         .leftMap[ValidationError](ValidationError.Repo)
     } yield createdFormSessionInvite.mapData(_.copy(user = user))
 
-    def getById(formSessionInviteId: Id, companyId: Option[Company.Id]): Result[Full] =
+    def getById(formSessionInviteId: Id, companyId: Company.Id): Result[Full] =
       validation.hasOwnership(formSessionInviteId, companyId)
 
-    def delete(formSessionInviteId: Id, companyId: Option[Company.Id]): Result[Unit] = for {
+    def delete(formSessionInviteId: Id, companyId: Company.Id): Result[Unit] = for {
       _ <- validation.hasOwnership(formSessionInviteId, companyId)
       _ <- repo.delete(formSessionInviteId).leftMap[ValidationError](ValidationError.Repo)
     } yield ()
 
-    def update(formSessionInvite: Update, companyId: Option[Company.Id]): Result[Full] = for {
+    def update(formSessionInvite: Update, companyId: Company.Id): Result[Full] = for {
       _ <- validation.hasOwnership(formSessionInvite.id, companyId)
       user <- userService.getByName(formSessionInvite.data.user.username)
         .orElse(userService.create(formSessionInvite.data.user))

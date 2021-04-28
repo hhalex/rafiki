@@ -40,5 +40,6 @@ object FormSessionSQLSpec extends Specification with IOChecker {
   check(listAllQ(10, 10))
   check(listByCompanyQ(companyId, 10, 10))
   check(listByCompanyContractQ(companyContractId, 10, 10))
+  check(getByCompanyContractQ(companyContractId))
 
 }

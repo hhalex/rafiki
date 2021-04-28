@@ -88,7 +88,7 @@ const FormEdit = ({ api, back }: APIProps & { back: () => void }) => {
   const { id } = useParams<{ id: any }>();
   const [data, setData] = React.useState<Form.Full | undefined>(undefined);
 
-  useEffect(() => api.getById(id).then(setData) as any, [data]);
+  useEffect(() => api.getById(id).then(setData) as any, []);
 
   return data
     ? <ValidatedForm

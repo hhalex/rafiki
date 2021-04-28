@@ -26,8 +26,9 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
   object FormSessionIdVar extends IdVar[FormSession.Id](FormSession.tagSerial)
   object FormSessionInviteIdVar extends IdVar[FormSessionInvite.Id](FormSessionInvite.tagSerial)
 
-  private def createFormEndpoint(companyService: Company.Service[F], formService: Form.Service[F]): AuthEndpoint[F] = {
-    case req @ POST -> Root / FormRoute asAuthed user =>
+  private def formEndpoints(companyService: Company.Service[F], formService: Form.Service[F], formSessionService: FormSession.Service[F]): AuthEndpoint[F] = {
+        // Create form
+    case req @ POST -> Root asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         form <- EitherT.liftF(req.request.as[Form.Create])
@@ -38,10 +39,8 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
         case Right(form) => Ok(form)
         case Left(err) => BadRequest(s"Error '$err' while creating form.")
       })
-  }
-
-  private def updateFormEndpoint(companyService: Company.Service[F], formService: Form.Service[F]): AuthEndpoint[F] = {
-    case req @ PUT -> Root / FormRoute / FormIdVar(id) asAuthed user =>
+      // Update form
+    case req @ PUT -> Root / FormIdVar(id) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         form <- EitherT.liftF(req.request.as[Form.Create])
@@ -52,10 +51,8 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
         case Right(saved) => Ok(saved)
         case Left(err) => BadRequest(s"Error '$err' while updating form.")
       }
-  }
-
-  private def getFormEndpoint(companyService: Company.Service[F], formService: Form.Service[F]): AuthEndpoint[F] = {
-    case GET -> Root / FormRoute / FormIdVar(id) asAuthed user => {
+      // get form by id
+    case GET -> Root / FormIdVar(id) asAuthed user => {
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         form <- formService.getById(id, companyUser.id.some)
@@ -66,10 +63,8 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
         case Left(err) => BadRequest(s"Error '$err' while getting form.")
       }
     }
-  }
-
-  private def deleteFormEndpoint(companyService: Company.Service[F], formService: Form.Service[F]): AuthEndpoint[F] = {
-    case DELETE -> Root / FormRoute / FormIdVar(id) asAuthed user => {
+      // delete form
+    case DELETE -> Root / FormIdVar(id) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         form <- formService.delete(id, companyUser.id.some)
@@ -79,13 +74,8 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
         case Right(form) => Ok(form)
         case Left(err) => BadRequest(s"Error '$err' while deleting form.")
       }
-    }
-  }
-
-  private def listFormsEndpoint(companyService: Company.Service[F], formService: Form.Service[F]): AuthEndpoint[F] = {
-    case GET -> Root / FormRoute :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(
-      offset,
-    ) asAuthed user =>
+      // list forms by company
+    case GET -> Root :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(offset) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         result <- formService.listByCompany(companyUser.id, pageSize.getOrElse(10), offset.getOrElse(0))
@@ -95,14 +85,12 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
         case Right(form) => Ok(form)
         case Left(err) => BadRequest(s"Error '$err' while listing forms.")
       })
-  }
-
-  private def createFormSessionEndpoint(companyService: Company.Service[F], formSessionService: FormSession.Service[F]): AuthEndpoint[F] = {
-    case req @ POST -> Root / FormRoute / FormIdVar(formId) / SessionRoute asAuthed user =>
+      // Create session of a form
+    case req @ POST -> Root / FormIdVar(formId) / "session" asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         formSession <- EitherT.liftF(req.request.as[FormSession.Create])
-        result <- formSessionService.create(formSession, formId, companyUser.id.some)
+        result <- formSessionService.create(formSession, formId, companyUser.id)
       } yield result
 
       action.value.flatMap({
@@ -111,25 +99,24 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
       })
   }
 
-  private def updateFormSessionEndpoint(companyService: Company.Service[F], formSessionService: FormSession.Service[F]): AuthEndpoint[F] = {
-    case req @ PUT -> Root / SessionRoute / FormSessionIdVar(id) asAuthed user =>
+  private def formSessionEndpoint(companyService: Company.Service[F], formSessionService: FormSession.Service[F], formSessionInviteService: FormSessionInvite.Service[F]): AuthEndpoint[F] = {
+        // update session
+    case req @ PUT -> Root / FormSessionIdVar(id) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         form <- EitherT.liftF(req.request.as[FormSession.Create])
-        result <- formSessionService.update(form.withId(id), companyUser.id.some)
+        result <- formSessionService.update(form.withId(id), companyUser.id)
       } yield result
 
       action.value.flatMap {
         case Right(saved) => Ok(saved)
         case Left(err) => BadRequest(s"Error '$err' while updating form session.")
       }
-  }
-
-  private def getFormSessionEndpoint(companyService: Company.Service[F], formSessionService: FormSession.Service[F]): AuthEndpoint[F] = {
-    case GET -> Root / SessionRoute / FormSessionIdVar(id) asAuthed user => {
+      // get session by id
+    case GET -> Root / FormSessionIdVar(id) asAuthed user => {
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        form <- formSessionService.getById(id, companyUser.id.some)
+        form <- formSessionService.getById(id, companyUser.id)
       } yield form
 
       action.value.flatMap {
@@ -137,13 +124,11 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
         case Left(err) => BadRequest(s"Error '$err' while getting form session.")
       }
     }
-  }
-
-  private def deleteFormSessionEndpoint(companyService: Company.Service[F], formSessionService: FormSession.Service[F]): AuthEndpoint[F] = {
-    case DELETE -> Root / SessionRoute / FormSessionIdVar(id) asAuthed user => {
+      // delete session
+    case DELETE -> Root / FormSessionIdVar(id) asAuthed user => {
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        form <- formSessionService.delete(id, companyUser.id.some)
+        form <- formSessionService.delete(id, companyUser.id)
       } yield form
 
       action.value.flatMap {
@@ -151,12 +136,8 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
         case Left(err) => BadRequest(s"Error '$err' while deleting form session.")
       }
     }
-  }
-
-  private def listFormSessionsEndpoint(companyService: Company.Service[F], formSessionService: FormSession.Service[F]): AuthEndpoint[F] = {
-    case GET -> Root / SessionRoute :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(
-    offset,
-    ) asAuthed user =>
+      // list sessions per company
+    case GET -> Root :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(offset) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         result <- formSessionService.listByCompany(companyUser.id, pageSize.getOrElse(10), offset.getOrElse(0))
@@ -166,68 +147,20 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
         case Right(form) => Ok(form)
         case Left(err) => BadRequest(s"Error '$err' while listing form sessions.")
       })
-  }
-
-  private def createFormSessionInviteEndpoint(companyService: Company.Service[F], formSessionInviteService: FormSessionInvite.Service[F]): AuthEndpoint[F] = {
-    case req @ POST -> Root / SessionRoute / FormSessionIdVar(formSessionId) / InviteRoute asAuthed user =>
+      // create invite on a session
+    case req @ POST -> Root / FormSessionIdVar(formSessionId) / InviteRoute asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         formSession <- EitherT.liftF(req.request.as[FormSessionInvite.Create])
-        result <- formSessionInviteService.create(formSession, formSessionId, companyUser.id.some)
+        result <- formSessionInviteService.create(formSession, formSessionId, companyUser.id)
       } yield result
 
       action.value.flatMap({
         case Right(form) => Ok(form)
         case Left(err) => BadRequest(s"Error '$err' while creating form session invite.")
       })
-  }
-
-  private def updateFormSessionInviteEndpoint(companyService: Company.Service[F], formSessionService: FormSessionInvite.Service[F]): AuthEndpoint[F] = {
-    case req @ PUT -> Root / InviteRoute / FormSessionInviteIdVar(inviteId) asAuthed user =>
-      val action = for {
-        companyUser <- companyService.getFromUser(user.id)
-        invite <- EitherT.liftF(req.request.as[FormSessionInvite.Create])
-        result <- formSessionService.update(invite.withId(inviteId), companyUser.id.some)
-      } yield result
-
-      action.value.flatMap {
-        case Right(saved) => Ok(saved)
-        case Left(err) => BadRequest(s"Error '$err' while updating form session invite.")
-      }
-  }
-
-  private def getFormSessionInviteEndpoint(companyService: Company.Service[F], formSessionService: FormSessionInvite.Service[F]): AuthEndpoint[F] = {
-    case GET -> Root / InviteRoute / FormSessionInviteIdVar(inviteId) asAuthed user => {
-      val action = for {
-        companyUser <- companyService.getFromUser(user.id)
-        invite <- formSessionService.getById(inviteId, companyUser.id.some)
-      } yield invite
-
-      action.value.flatMap {
-        case Right(invite) => Ok(invite)
-        case Left(err) => BadRequest(s"Error '$err' while getting form session invite.")
-      }
-    }
-  }
-
-  private def deleteFormSessionInviteEndpoint(companyService: Company.Service[F], formSessionInviteService: FormSessionInvite.Service[F]): AuthEndpoint[F] = {
-    case DELETE -> Root / InviteRoute / FormSessionInviteIdVar(inviteId) asAuthed user => {
-      val action = for {
-        companyUser <- companyService.getFromUser(user.id)
-        invite <- formSessionInviteService.delete(inviteId, companyUser.id.some)
-      } yield invite
-
-      action.value.flatMap {
-        case Right(invite) => Ok(invite)
-        case Left(err) => BadRequest(s"Error '$err' while deleting form session invite.")
-      }
-    }
-  }
-
-  private def listFormSessionInvitesBySessionEndpoint(companyService: Company.Service[F], formSessionInviteService: FormSessionInvite.Service[F]): AuthEndpoint[F] = {
-    case GET -> Root / SessionRoute / FormSessionIdVar(formSessionId) / InviteRoute :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(
-    offset,
-    ) asAuthed user =>
+      // list invites per session
+    case GET -> Root / FormSessionIdVar(formSessionId) / InviteRoute :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(offset) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
         invites <- formSessionInviteService.listByFormSession(formSessionId, pageSize.getOrElse(10), offset.getOrElse(0))
@@ -239,6 +172,43 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
       })
   }
 
+  private def formSessionInviteEndpoint(companyService: Company.Service[F], formSessionInviteService: FormSessionInvite.Service[F]): AuthEndpoint[F] = {
+    // update invite
+    case req @ PUT -> Root / FormSessionInviteIdVar(inviteId) asAuthed user =>
+      val action = for {
+        companyUser <- companyService.getFromUser(user.id)
+        invite <- EitherT.liftF(req.request.as[FormSessionInvite.Create])
+        result <- formSessionInviteService.update(invite.withId(inviteId), companyUser.id)
+      } yield result
+
+      action.value.flatMap {
+        case Right(saved) => Ok(saved)
+        case Left(err) => BadRequest(s"Error '$err' while updating form session invite.")
+      }
+      // get invite by id
+    case GET -> Root / FormSessionInviteIdVar(inviteId) asAuthed user =>
+      val action = for {
+        companyUser <- companyService.getFromUser(user.id)
+        invite <- formSessionInviteService.getById(inviteId, companyUser.id)
+      } yield invite
+
+      action.value.flatMap {
+        case Right(invite) => Ok(invite)
+        case Left(err) => BadRequest(s"Error '$err' while getting form session invite.")
+      }
+      // delete invite
+    case DELETE -> Root / FormSessionInviteIdVar(inviteId) asAuthed user =>
+      val action = for {
+        companyUser <- companyService.getFromUser(user.id)
+        invite <- formSessionInviteService.delete(inviteId, companyUser.id)
+      } yield invite
+
+      action.value.flatMap {
+        case Right(invite) => Ok(invite)
+        case Left(err) => BadRequest(s"Error '$err' while deleting form session invite.")
+      }
+  }
+
   def endpoints(
                  companyService: Company.Service[F],
                  formService: Form.Service[F],
@@ -247,31 +217,10 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
                  auth: SecuredRequestHandler[F, User.Id, User.Authed, Auth],
                )(implicit A: AuthorizationInfo[F, Role, User.Authed]): HttpRoutes[F] = {
 
-    val formEndpoints: AuthService[F] = Authentication.companyOnly(
-      createFormEndpoint(companyService, formService)
-          .orElse(getFormEndpoint(companyService, formService))
-          .orElse(deleteFormEndpoint(companyService, formService))
-          .orElse(updateFormEndpoint(companyService, formService))
-          .orElse(listFormsEndpoint(companyService, formService))
-      )
-
-    val formSessionEndpoints: AuthService[F] = Authentication.companyOnly(
-      createFormSessionEndpoint(companyService, formSessionService)
-        .orElse(getFormSessionEndpoint(companyService, formSessionService))
-        .orElse(deleteFormSessionEndpoint(companyService, formSessionService))
-        .orElse(updateFormSessionEndpoint(companyService, formSessionService))
-        .orElse(listFormSessionsEndpoint(companyService, formSessionService))
+    Router(
+      FormRoute -> auth.liftService(Authentication.companyOnly(formEndpoints(companyService, formService, formSessionService))),
+      SessionRoute -> auth.liftService(Authentication.companyOnly(formSessionEndpoint(companyService, formSessionService, formSessionInviteService))),
+      InviteRoute -> auth.liftService(Authentication.companyOnly(formSessionInviteEndpoint(companyService, formSessionInviteService)))
     )
-
-    val formSessionInviteEndpoints: AuthService[F] = Authentication.companyOnly(
-      createFormSessionInviteEndpoint(companyService, formSessionInviteService)
-        .orElse(getFormSessionInviteEndpoint(companyService, formSessionInviteService))
-        .orElse(deleteFormSessionInviteEndpoint(companyService, formSessionInviteService))
-        .orElse(updateFormSessionInviteEndpoint(companyService, formSessionInviteService))
-        .orElse(listFormSessionInvitesBySessionEndpoint(companyService, formSessionInviteService))
-    )
-
-     auth.liftService(formEndpoints) <+> auth.liftService(formSessionEndpoints) <+> auth.liftService(formSessionInviteEndpoints)
-
   }
 }

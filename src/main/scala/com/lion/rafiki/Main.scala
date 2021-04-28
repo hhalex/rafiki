@@ -49,7 +49,7 @@ object Main extends IOApp {
       formService = new Form.Service[IO](formRepo, formValidation)
 
       formSessionRepo = new DoobieFormSessionRepo[IO](xa)
-      formSessionValidation = new FormSession.FromRepoValidation[IO](formSessionRepo, formValidation, companyContractValidation)
+      formSessionValidation = new FormSession.FromRepoValidation[IO](formSessionRepo, formValidation, companyContractRepo)
       formSessionService = new FormSession.Service[IO](formSessionRepo, formSessionValidation)
 
       formSessionInviteRepo = new DoobieFormSessionInviteRepo[IO](xa)
@@ -63,7 +63,7 @@ object Main extends IOApp {
         tokenStore,
         initialUserStore.identityStore,
         TSecTokenSettings(
-          expiryDuration = 10.minutes,
+          expiryDuration = 30.minutes,
           maxIdle = None
         ))
       routeAuth = SecuredRequestHandler(auth)
