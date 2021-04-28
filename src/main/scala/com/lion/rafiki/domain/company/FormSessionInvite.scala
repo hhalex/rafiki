@@ -56,7 +56,7 @@ object FormSessionInvite extends TaggedId[FormSessionInvite[_]] {
     } yield formSessionInvite
   }
 
-  class Service[F[_] : Monad](repo: Repo[F], validation: Validation[F], userService: User.Service[F]) {
+  class Service[F[_] : Monad](repo: Repo[F], validation: Validation[F], formSessionValidation: FormSession.Validation[F], userService: User.Service[F]) {
     type Result[T] = EitherT[F, ValidationError, T]
 
     def create(formSessionInvite: Create, formSessionId: FormSession.Id, companyId: Company.Id): Result[Full] = for {
@@ -83,8 +83,11 @@ object FormSessionInvite extends TaggedId[FormSessionInvite[_]] {
         .leftMap[ValidationError](ValidationError.Repo)
     } yield result
 
-    def listByFormSession(formSessionId: FormSession.Id, pageSize: Int, offset: Int): Result[List[Full]] =
-      repo.listByFormSession(formSessionId, pageSize, offset).leftMap(ValidationError.Repo)
+    def listByFormSession(formSessionId: FormSession.Id, companyId: Company.Id, pageSize: Int, offset: Int): Result[List[Full]] = for {
+      _ <- formSessionValidation.hasOwnership(formSessionId, companyId)
+      list <- repo.listByFormSession(formSessionId, pageSize, offset).leftMap[ValidationError](ValidationError.Repo)
+    } yield list
+
   }
 }
 
