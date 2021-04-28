@@ -13,7 +13,7 @@ import tsec.passwordhashers.jca.BCrypt
 
 private[sql] object UserSQL {
 
-  implicit val fuuidReader: Meta[User.Id] = Meta[Long].imap(User.tagSerial)(_.asInstanceOf[Long])
+  implicit val userIdReader: Meta[User.Id] = Meta[Long].imap(User.tagSerial)(_.asInstanceOf[Long])
   implicit val passwordReader: Meta[PasswordHash[BCrypt]] = Meta[String].imap(PasswordHash[BCrypt])(_.toString)
   implicit val han = LogHandler.jdkLogHandler
 

@@ -4,11 +4,9 @@ import doobie.implicits._
 import doobie.implicits.javasql._
 import doobie.implicits.javatimedrivernative._
 import cats.effect.Bracket
-import cats.implicits.{toFunctorOps, toTraverseOps}
-import com.lion.rafiki.domain.Company.Id
-import com.lion.rafiki.domain.CompanyContract.Id
+import cats.implicits.toFunctorOps
 import com.lion.rafiki.domain.company.{Form, FormSession}
-import com.lion.rafiki.domain.{Company, CompanyContract, User}
+import com.lion.rafiki.domain.{Company, CompanyContract}
 import com.lion.rafiki.sql.SQLPagination.paginate
 import doobie.{Fragments, Transactor}
 import doobie.implicits.toSqlInterpolator
@@ -17,8 +15,8 @@ import doobie.util.meta.Meta
 import java.time.Instant
 
 private[sql] object FormSessionSQL {
-  import CompanyContractSQL._
-  import CompanySQL._
+  import CompanyContractSQL.companyContractIdMeta
+  import CompanySQL.companyIdReader
   import FormSQL._
   implicit val formSessionIdReader: Meta[FormSession.Id] = Meta[Long].imap(FormSession.tagSerial)(_.asInstanceOf[Long])
 
