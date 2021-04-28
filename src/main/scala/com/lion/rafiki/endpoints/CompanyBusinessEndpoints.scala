@@ -5,7 +5,7 @@ import cats.effect.Sync
 import cats.syntax.all._
 import com.lion.rafiki.auth.Role
 import com.lion.rafiki.domain.company.{Form, FormSession, FormSessionInvite}
-import com.lion.rafiki.domain.{Company, User}
+import com.lion.rafiki.domain.{Company, User, ValidationError}
 import org.http4s.HttpRoutes
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
@@ -31,7 +31,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     case req @ POST -> Root asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        form <- EitherT.liftF(req.request.as[Form.Create])
+        form <- req.request.attemptAs[Form.Create].leftMap(ValidationError.Decoding)
         result <- formService.create(form, companyUser.id.some)
       } yield result
 
@@ -43,7 +43,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     case req @ PUT -> Root / FormIdVar(id) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        form <- EitherT.liftF(req.request.as[Form.Create])
+        form <- req.request.attemptAs[Form.Create].leftMap(ValidationError.Decoding)
         result <- formService.update(form.withId(id), companyUser.id.some)
       } yield result
 
@@ -89,7 +89,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     case req @ POST -> Root / FormIdVar(formId) / "session" asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        formSession <- EitherT.liftF(req.request.as[FormSession.Create])
+        formSession <- req.request.attemptAs[FormSession.Create].leftMap(ValidationError.Decoding)
         result <- formSessionService.create(formSession, formId, companyUser.id)
       } yield result
 
@@ -104,7 +104,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     case req @ PUT -> Root / FormSessionIdVar(id) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        form <- EitherT.liftF(req.request.as[FormSession.Create])
+        form <- req.request.attemptAs[FormSession.Create].leftMap(ValidationError.Decoding)
         result <- formSessionService.update(form.withId(id), companyUser.id)
       } yield result
 
@@ -151,7 +151,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     case req @ POST -> Root / FormSessionIdVar(formSessionId) / InviteRoute asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        formSession <- EitherT.liftF(req.request.as[FormSessionInvite.Create])
+        formSession <- req.request.attemptAs[FormSessionInvite.Create].leftMap(ValidationError.Decoding)
         result <- formSessionInviteService.create(formSession, formSessionId, companyUser.id)
       } yield result
 
@@ -177,7 +177,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     case req @ PUT -> Root / FormSessionInviteIdVar(inviteId) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        invite <- EitherT.liftF(req.request.as[FormSessionInvite.Create])
+        invite <- req.request.attemptAs[FormSessionInvite.Create].leftMap(ValidationError.Decoding)
         result <- formSessionInviteService.update(invite.withId(inviteId), companyUser.id)
       } yield result
 

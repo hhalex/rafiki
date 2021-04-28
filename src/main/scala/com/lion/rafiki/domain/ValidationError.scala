@@ -1,5 +1,7 @@
 package com.lion.rafiki.domain
 
+import org.http4s.DecodeFailure
+
 sealed trait ValidationError extends Product with Serializable
 
 object ValidationError {
@@ -15,4 +17,5 @@ object ValidationError {
   case object CompanyContractFull extends ValidationError
 
   case class Repo(e: RepoError) extends ValidationError
+  case class Decoding(e: DecodeFailure) extends ValidationError
 }
