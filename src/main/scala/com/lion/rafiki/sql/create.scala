@@ -140,6 +140,7 @@ object create {
        id                     bigserial         PRIMARY KEY,
        form_session_id        bigint            NOT NULL,
        user_id                bigint            NOT NULL,
+       team                   text              NOT NULL DEFAULT '/',
        accept_conditions      boolean,
        FOREIGN KEY (form_session_id)
           REFERENCES form_sessions(id),

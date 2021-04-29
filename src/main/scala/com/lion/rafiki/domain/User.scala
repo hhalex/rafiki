@@ -1,15 +1,12 @@
 package com.lion.rafiki.domain
 
-import cats.conversions.all.autoWidenBifunctor
-import cats.data.{EitherT, OptionT}
-import cats.{Applicative, Monad}
+import cats.data.EitherT
+import cats.Monad
 import cats.syntax.all._
 import com.lion.rafiki.auth.Role
-import io.circe.{Decoder, Encoder, Json, JsonObject}
-import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
+import io.circe.{Decoder, Encoder, Json}
+import io.circe.generic.semiauto.deriveDecoder
 import io.circe.syntax.EncoderOps
-import shapeless.tag
-import shapeless.tag.@@
 import tsec.passwordhashers.{PasswordHash, PasswordHasher}
 import tsec.passwordhashers.jca.BCrypt
 

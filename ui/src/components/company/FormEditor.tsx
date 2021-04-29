@@ -32,7 +32,7 @@ export const FormCRUD = ({ api }: APIProps) => {
       <Route path={`${path}/new`}>
         <ValidatedForm
           initialValues={{}}
-          submit={(data: Form.Create) => { api.create(data).catch(() => { }); }}
+          submit={(data: Form.Create) => api.create(data).catch(() => { })}
           back={backHome}
         />
       </Route>
@@ -93,7 +93,7 @@ const FormEdit = ({ api, back }: APIProps & { back: () => void }) => {
   return data
     ? <ValidatedForm
       initialValues={data as EditorData}
-      submit={(data: Form.Update) => { api.update(data).catch(() => { }); }}
+      submit={(data: Form.Update) => api.update(data).catch(() => { })}
       back={back}
     />
     : <div>Loading</div>
@@ -214,7 +214,7 @@ const validationSchema = Yup.object({
   })
 });
 
-const ValidatedForm = ({ initialValues, back, submit }: { initialValues: EditorData, back: () => void, submit: ((_: Form.Create) => void) | ((_: Form.Update) => void) }) => {
+const ValidatedForm = ({ initialValues, back, submit }: { initialValues: EditorData, back: () => void, submit: ((_: Form.Create) => Promise<any>) | ((_: Form.Update) => Promise<any>) }) => {
   const classes = useStylesVF();
   const editOrAddLabel = initialValues?.id ? "Editer" : "Ajouter";
 
@@ -228,8 +228,8 @@ const ValidatedForm = ({ initialValues, back, submit }: { initialValues: EditorD
     validationSchema={validationSchema}
     validateOnChange={false}
     onSubmit={(values) => {
-      submit({...values, questions: undefined, tree: {children: values.questions}} as any);
-      back();
+      submit({...values, questions: undefined, tree: {children: values.questions}} as any)
+        .then(back);
     }}
   >{({ values, touched, errors, handleChange }) => (
     <FormikForm noValidate autoComplete="off">

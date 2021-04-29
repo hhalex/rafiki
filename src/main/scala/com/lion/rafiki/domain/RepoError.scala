@@ -22,6 +22,13 @@ object RepoError {
   implicit class ConnectionIOwithErrors[T](c: ConnectionIO[T]) {
     def toResult(): EitherT[ConnectionIO, RepoError, T] = EitherT(c.attemptSql).leftMap(RepoError.fromSQLException)
   }
+
+  implicit class ConnectionIOwithErrorsOpt[T](c: ConnectionIO[Option[T]]) {
+    def toResult(): EitherT[ConnectionIO, RepoError, T] = EitherT(c.attemptSql).leftMap(RepoError.fromSQLException).flatMap {
+      case Some(value) => EitherT.rightT(value)
+      case None => EitherT.leftT(RepoError.NotFound)
+    }
+  }
 }
 
 

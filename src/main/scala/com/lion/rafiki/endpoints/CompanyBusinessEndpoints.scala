@@ -1,11 +1,10 @@
 package com.lion.rafiki.endpoints
 
-import cats.data.EitherT
 import cats.effect.Sync
 import cats.syntax.all._
 import com.lion.rafiki.auth.Role
 import com.lion.rafiki.domain.company.{Form, FormSession, FormSessionInvite}
-import com.lion.rafiki.domain.{Company, CompanyContract, User, ValidationError}
+import com.lion.rafiki.domain.{Company, User, ValidationError, WithId}
 import org.http4s.HttpRoutes
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
@@ -151,8 +150,8 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     case req @ POST -> Root / FormSessionIdVar(formSessionId) / InviteRoute asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        formSession <- req.request.attemptAs[FormSessionInvite.Create].leftMap(ValidationError.Decoding)
-        result <- formSessionInviteService.create(formSession, formSessionId, companyUser.id)
+        formSessionInvite <- req.request.attemptAs[FormSessionInvite[String]].leftMap(ValidationError.Decoding)
+        result <- formSessionInviteService.create(formSessionInvite, formSessionId, companyUser.id)
       } yield result
 
       action.value.flatMap({
@@ -163,7 +162,10 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     case GET -> Root / FormSessionIdVar(formSessionId) / InviteRoute :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(offset) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        invites <- formSessionInviteService.listByFormSession(formSessionId, companyUser.id, pageSize.getOrElse(10), offset.getOrElse(0))
+        invites <- (pageSize, offset) match {
+          case (None, None) => formSessionInviteService.getByFormSession(formSessionId, companyUser.id)
+          case _ => formSessionInviteService.listByFormSession(formSessionId, companyUser.id, pageSize.getOrElse(10), offset.getOrElse(0))
+        }
       } yield invites
 
       action.value.flatMap({
@@ -177,7 +179,7 @@ class CompanyBusinessEndpoints[F[_]: Sync] extends Http4sDsl[F] {
     case req @ PUT -> Root / FormSessionInviteIdVar(inviteId) asAuthed user =>
       val action = for {
         companyUser <- companyService.getFromUser(user.id)
-        invite <- req.request.attemptAs[FormSessionInvite.Create].leftMap(ValidationError.Decoding)
+        invite <- req.request.attemptAs[FormSessionInvite[String]].leftMap(ValidationError.Decoding)
         result <- formSessionInviteService.update(invite.withId(inviteId), companyUser.id)
       } yield result
 

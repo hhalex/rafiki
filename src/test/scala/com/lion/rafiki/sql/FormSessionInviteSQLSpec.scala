@@ -9,6 +9,7 @@ import doobie.implicits._
 import doobie.specs2._
 import doobie.util.ExecutionContexts
 import doobie.util.transactor.Transactor
+import org.http4s.dsl.io.Path
 import org.specs2.mutable.Specification
 
 object FormSessionInviteSQLSpec extends Specification with IOChecker {
@@ -35,8 +36,8 @@ object FormSessionInviteSQLSpec extends Specification with IOChecker {
 
   check(byIdQ(formSessionInviteId))
   check(byFormSessionQ(formSessionId))
-  check(insertQ(formSessionId, userId, true.some))
-  check(updateQ(formSessionInviteId, formSessionId, userId, true.some))
+  check(insertQ(formSessionId, userId, "/", true.some))
+  check(updateQ(formSessionInviteId, userId, "/", true.some))
   check(deleteQ(formSessionInviteId))
   check(listAllQ(10, 10))
   check(listBySessionQ(formSessionId, 10, 10))

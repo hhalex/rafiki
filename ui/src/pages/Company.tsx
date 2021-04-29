@@ -7,6 +7,9 @@ import { AuthenticatedFetch } from '../atoms/Auth';
 import { Typography } from '@material-ui/core';
 import { FormCRUD } from '../components/company/FormEditor';
 import { Form } from '../api/company/form';
+import { FormSessionCRUD } from '../components/company/FormSessionEditor';
+import { FormSession } from '../api/company/session';
+import { FormSessionInvite } from '../api/company/invite';
 
 const useStyles = makeStyles((theme: Theme) => ({
   root: {
@@ -53,6 +56,8 @@ export default function CompanyView({authFetch}: {authFetch: AuthenticatedFetch}
   const { path, url } = useRouteMatch();
 
   const formApi = Form.createApi(authFetch);
+  const formSessionApi = FormSession.createApi(authFetch);
+  const formSessionInviteApi = FormSessionInvite.createApi(authFetch);
 
   return (
     <div className={classes.root}>
@@ -77,7 +82,7 @@ export default function CompanyView({authFetch}: {authFetch: AuthenticatedFetch}
               <FormCRUD api={formApi} />
             </Route>
             <Route path={`${path}/sessions`}>
-              Sessions
+              <FormSessionCRUD apiSession={formSessionApi} apiForm={formApi} apiInvite={formSessionInviteApi} />
             </Route>
             <Route path={`${path}/bills`}>
               Factures

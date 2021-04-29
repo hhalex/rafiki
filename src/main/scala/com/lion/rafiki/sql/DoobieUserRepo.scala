@@ -48,7 +48,7 @@ private[sql] object UserSQL {
 class DoobieUserRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
   extends User.Repo[F] {
   import UserSQL._
-  import RepoError.ConnectionIOwithErrors
+  import RepoError._
 
   override def create(user: User.CreateRecord): Result[User.Record] =
     insertQ(user.username, user.password)
@@ -60,7 +60,7 @@ class DoobieUserRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
 
   override def update(user: User.withId[Option[PasswordHash[BCrypt]]]): Result[User.Record] =
       updateQ(user.id, user.data.username.some, user.data.password).run
-        .flatMap(_ => byIdQ(user.id).unique)
+        .flatMap(_ => byIdQ(user.id).option)
         .toResult()
         .transact(xa)
 
@@ -75,7 +75,7 @@ class DoobieUserRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
     listAllQ(pageSize: Int, offset: Int).to[List].toResult().transact(xa)
 
   override def findByUserName(userName: String): Result[User.Record] =
-    byEmailQ(userName).unique.toResult().transact(xa)
+    byEmailQ(userName).option.toResult().transact(xa)
 
   override def deleteByUserName(userName: String): Result[Unit] =
     findByUserName(userName).flatMap(u => delete(u.id))
