@@ -31,7 +31,7 @@ lazy val root = (project in file("."))
     addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.11.3" cross CrossVersion.full),
     addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
     watchSources ++= (baseDirectory.value / "public/ui" ** "*").get,
-    resourceDirectory in Compile := file("ui") / "build"
+    Compile / resourceDirectory := file("ui") / "build"
   )
 
 scalacOptions ++= Seq(
