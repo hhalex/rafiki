@@ -1,24 +1,25 @@
 package com.lion.rafiki
 
 import cats.effect.{Blocker, ExitCode, IO, IOApp}
-import cats.implicits.toSemigroupKOps
-import com.lion.rafiki.auth.{TokenStore, UserStore}
+import cats._
+import cats.data.Kleisli
+import cats.syntax.semigroupk._
+import com.lion.rafiki.auth.{CryptoBits, HotUserStore, PrivateKey, UserAuth}
 import com.lion.rafiki.domain.company.{Form, FormSession, FormSessionInvite}
 import com.lion.rafiki.domain.{Company, CompanyContract, User}
-import com.lion.rafiki.endpoints.{Authentication, CompanyBusinessEndpoints, CompanyEndpoints, UserEndpoints}
+import com.lion.rafiki.endpoints.{AuthenticationEndpoints, CompanyBusinessEndpoints, CompanyEndpoints, UserEndpoints}
 import com.lion.rafiki.sql.{DoobieCompanyContractRepo, DoobieCompanyRepo, DoobieFormRepo, DoobieFormSessionInviteRepo, DoobieFormSessionRepo, DoobieUserRepo, create}
 import doobie.util.transactor.Transactor
 import doobie.implicits._
+import fs2._
 import org.http4s.implicits._
-import fs2.Stream
 import org.http4s.server.Router
 import org.http4s.server.blaze.BlazeServerBuilder
 import org.http4s.server.middleware.Logger
-import tsec.authentication.{BearerTokenAuthenticator, SecuredRequestHandler, TSecTokenSettings}
 
+import java.time.Clock
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.global
-import scala.concurrent.duration.DurationInt
 
 object Main extends IOApp {
   def run(args: List[String]) = {
@@ -35,56 +36,54 @@ object Main extends IOApp {
       )
       _ <- Stream.eval(create.allTables.transact(xa))
 
-      userRepo = new DoobieUserRepo[IO](xa)
-      userService = new User.Service[IO](userRepo)
+      exitCode <- {
 
-      companyRepo = new DoobieCompanyRepo[IO](xa)
-      companyService = new Company.Service[IO](companyRepo, userService)
-      companyContractRepo = new DoobieCompanyContractRepo[IO](xa)
-      companyContractValidation = new CompanyContract.FromRepoValidation[IO](companyContractRepo)
-      companyContractService = new CompanyContract.Service[IO](companyContractRepo)
+        val userRepo = new DoobieUserRepo[IO](xa)
+        val userService = new User.Service[IO](userRepo)
+        val companyRepo = new DoobieCompanyRepo[IO](xa)
 
-      formRepo = new DoobieFormRepo[IO](xa)
-      formValidation = new Form.FromRepoValidation[IO](formRepo)
-      formService = new Form.Service[IO](formRepo, formValidation)
+        val companyService = new Company.Service[IO](companyRepo, userService)
+        val companyContractRepo = new DoobieCompanyContractRepo[IO](xa)
+        val companyContractValidation = new CompanyContract.FromRepoValidation[IO](companyContractRepo)
+        val companyContractService = new CompanyContract.Service[IO](companyContractRepo)
 
-      formSessionRepo = new DoobieFormSessionRepo[IO](xa)
-      formSessionValidation = new FormSession.FromRepoValidation[IO](formSessionRepo, formValidation, companyContractRepo)
-      formSessionService = new FormSession.Service[IO](formSessionRepo, formSessionValidation)
+        val formRepo = new DoobieFormRepo[IO](xa)
+        val formValidation = new Form.FromRepoValidation[IO](formRepo)
+        val formService = new Form.Service[IO](formRepo, formValidation)
 
-      formSessionInviteRepo = new DoobieFormSessionInviteRepo[IO](xa)
-      formSessionInviteValidation = new FormSessionInvite.FromRepoValidation[IO](formSessionInviteRepo, formSessionValidation)
-      formSessionInviteService = new FormSessionInvite.Service[IO](formSessionInviteRepo, formSessionInviteValidation, formSessionValidation, userService)
+        val formSessionRepo = new DoobieFormSessionRepo[IO](xa)
+        val formSessionValidation = new FormSession.FromRepoValidation[IO](formSessionRepo, formValidation, companyContractRepo)
 
-      initialUserStore = UserStore(userService, companyService, conf.hotUsersList)
-      tokenStore <- Stream.eval(TokenStore.empty)
+        val formSessionService = new FormSession.Service[IO](formSessionRepo, formSessionValidation)
+        val formSessionInviteRepo = new DoobieFormSessionInviteRepo[IO](xa)
+        val formSessionInviteValidation = new FormSessionInvite.FromRepoValidation[IO](formSessionInviteRepo, formSessionValidation)
+        val formSessionInviteService = new FormSessionInvite.Service[IO](formSessionInviteRepo, formSessionInviteValidation, formSessionValidation, userService)
 
-      auth = BearerTokenAuthenticator(
-        tokenStore,
-        initialUserStore.identityStore,
-        TSecTokenSettings(
-          expiryDuration = 30.minutes,
-          maxIdle = None
-        ))
-      routeAuth = SecuredRequestHandler(auth)
-      authorizationInfo = Authentication.authRole[IO]()
+        val privateKey = PrivateKey(scala.io.Codec.toUTF8(scala.util.Random.alphanumeric.take(20).mkString("")))
+        val crypto = CryptoBits(privateKey)
+        val clock = Clock.systemUTC()
 
-      companyEndpoints = new CompanyEndpoints[IO]().endpoints(companyService, companyContractService, routeAuth)(authorizationInfo)
-      userEndpoints = new UserEndpoints[IO]().endpoints(userService, initialUserStore, routeAuth)(authorizationInfo)
-      companyBusinessEndpoints = new CompanyBusinessEndpoints[IO]().endpoints(companyService, formService, formSessionService, formSessionInviteService, routeAuth)(authorizationInfo)
+        val hotUserStore = new HotUserStore[IO](conf.hotUsersList)
+        val userAuth = new UserAuth[IO](userService, companyRepo, hotUserStore, crypto)
 
-      exitCode <- BlazeServerBuilder[IO](global)
-        .bindHttp(conf.port, conf.host)
-        .withHttpApp(Logger.httpApp[IO](true, true)(
-          Router(
-            "/" -> (userEndpoints <+> Routes.uiRoutes),
-            "/api" -> Router(
-              "/" -> companyEndpoints,
-              "/company" -> companyBusinessEndpoints
-            )
-          ).orNotFound
-        ))
-        .serve
+        val authEndpoints = new AuthenticationEndpoints[IO]().endpoints(userAuth, clock)
+        val companyEndpoints = new CompanyEndpoints[IO]().endpoints(companyService, companyContractService, userAuth)
+        val userEndpoints = new UserEndpoints[IO]().endpoints(userService, userAuth)
+        val companyBusinessEndpoints = new CompanyBusinessEndpoints[IO]().endpoints(formService, formSessionService, formSessionInviteService, userAuth)
+
+        val httpApp = Router(
+          "/" -> (authEndpoints <+> Routes.uiRoutes),
+          "/api" -> Router(
+            "/company" -> companyBusinessEndpoints,
+            "/admin" -> (companyEndpoints <+> userEndpoints),
+          )
+        ).orNotFound
+
+        BlazeServerBuilder[IO](global)
+          .bindHttp(conf.port, conf.host)
+          .withHttpApp(Logger.httpApp[IO](true, true)(httpApp))
+          .serve
+      }
     } yield exitCode
   }.drain.compile.drain.as(ExitCode.Success)
 }

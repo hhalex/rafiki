@@ -24,6 +24,9 @@ private[sql] object CompanySQL {
   def byUserIdQ(id: User.Id) =
     sql"""SELECT * FROM companies WHERE rh_user=$id""".query[Company.Record]
 
+  def byUserEmailQ(email: String) =
+    sql"""SELECT * FROM companies c LEFT JOIN users u ON c.rh_user = u.id WHERE u.email = $email""".query[Company.Record]
+
   def insertQ(name: String, rh_user: User.Id) =
     sql"""INSERT INTO companies (name,rh_user) VALUES ($name,$rh_user)"""
       .update
@@ -52,7 +55,7 @@ private[sql] object CompanySQL {
 class DoobieCompanyRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
   extends Company.Repo[F] {
   import CompanySQL._
-  import com.lion.rafiki.domain.RepoError.ConnectionIOwithErrors
+  import com.lion.rafiki.domain.RepoError._
 
   override def create(company: Company.CreateRecord): Result[Company.Record] = insertQ(company.name, company.rh_user)
     .withUniqueGeneratedKeys[Company.Id]("id")
@@ -61,12 +64,13 @@ class DoobieCompanyRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
     .transact(xa)
 
   override def update(company: Company.Record): Result[Company.Record] = {
-    updateQ(company.id, company.data.name).run.flatMap(_ => byIdQ(company.id).unique)
+    updateQ(company.id, company.data.name).run
+      .as(company)
       .toResult()
       .transact(xa)
   }
 
-  override def get(id: Company.Id): Result[Company.Record] = byIdQ(id).unique.toResult().transact(xa)
+  override def get(id: Company.Id): Result[Company.Record] = byIdQ(id).option.toResult().transact(xa)
 
   override def delete(id: Company.Id): Result[Unit] = byIdQ(id).unique
     .flatMap(_ => deleteQ(id).run.as(()))
@@ -82,5 +86,6 @@ class DoobieCompanyRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
       .toResult()
       .transact(xa)
 
-  override def getByUser(id: User.Id): Result[Company.Record] = byUserIdQ(id).unique.toResult().transact(xa)
+  override def getByUser(id: User.Id): Result[Company.Record] = byUserIdQ(id).option.toResult().transact(xa)
+  override def getByUserEmail(email: String): Result[Company.Record] = byUserEmailQ(email).option.toResult().transact(xa)
 }

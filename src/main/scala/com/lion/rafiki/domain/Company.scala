@@ -34,6 +34,7 @@ object Company extends TaggedId[Company[_]] {
     def update(c: Record): Result[Record]
     def get(id: Id): Result[Record]
     def getByUser(id: User.Id): Result[Record]
+    def getByUserEmail(userEmail: String): Result[Record]
     def delete(id: Id): Result[Unit]
     def list(pageSize: Int, offset: Int): Result[List[Record]]
     def listWithUser(pageSize: Int, offset: Int): Result[List[Full]]
@@ -59,12 +60,6 @@ object Company extends TaggedId[Company[_]] {
       for {
         company <- companyRepo.get(id).leftMap[ValidationError](ValidationError.Repo)
         user <- userService.getById(company.data.rh_user)
-      } yield company.mapData(_.copy(rh_user = user.data))
-
-    def getFromUser(id: User.Id): Result[Full] =
-      for {
-        user <- userService.getById(id)
-        company <-  companyRepo.getByUser(id).leftMap[ValidationError](ValidationError.Repo)
       } yield company.mapData(_.copy(rh_user = user.data))
 
     def delete(id: Id): Result[Unit] = companyRepo.delete(id).leftMap[ValidationError](ValidationError.Repo)

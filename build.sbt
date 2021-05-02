@@ -19,7 +19,6 @@ lazy val root = (project in file("."))
       "org.http4s"          %% "http4s-dsl"          % Http4sVersion,
       "io.github.jmcardon"  %% "tsec-common"         % TsecVersion,
       "io.github.jmcardon"  %% "tsec-password"       % TsecVersion,
-      "io.github.jmcardon"  %% "tsec-http4s"         % TsecVersion,
       "io.chrisdavenport"   %% "fuuid"               % FuuidVersion,
       "io.circe"            %% "circe-generic"       % CirceVersion,
       "org.tpolecat"        %% "doobie-core"         % DoobieVersion,

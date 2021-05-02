@@ -3,7 +3,6 @@ package com.lion.rafiki.domain
 import cats.data.EitherT
 import cats.Monad
 import cats.syntax.all._
-import com.lion.rafiki.auth.Role
 import io.circe.{Decoder, Encoder, Json}
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.syntax.EncoderOps
@@ -28,7 +27,7 @@ object User extends TaggedId[User[_]] {
   implicit val userUpdateDecoder: Decoder[User.Update] = WithId.decoder
   implicit val userFullEncoder: Encoder[User.Full] = WithId.encoder
 
-  case class Authed(id: Id, username: String, password: PasswordHash[BCrypt], role: Role)
+  case class Authed(email: String)
 
   type CreateRecord = User[PasswordHash[BCrypt]]
   type Record = WithId[Id, CreateRecord]
@@ -61,8 +60,13 @@ object User extends TaggedId[User[_]] {
     def getById(userId: Id): Result[Full] =
       repo.get(userId).leftMap[ValidationError](ValidationError.Repo)
 
-    def getByName(userName: String): Result[Full] =
-      repo.findByUserName(userName).leftMap[ValidationError](ValidationError.Repo)
+    def getByName(email: String): Result[Full] = repo.findByUserName(email).leftMap[ValidationError] (ValidationError.Repo)
+
+    def validateCredentials(email: String, password: String): Result[Full] = for {
+      user <- repo.findByUserName(email).leftMap[ValidationError] (ValidationError.Repo)
+      isValidPassword <- EitherT.liftF(BCrypt.checkpwBool[F](password, user.data.password))
+      _ <- if (isValidPassword) EitherT.rightT[F, ValidationError](()) else EitherT.leftT[F, Unit](ValidationError.UserCredentialsIncorrect: ValidationError)
+    } yield user
 
     def delete(userId: Id): F[Unit] =
       repo.delete(userId).value.void

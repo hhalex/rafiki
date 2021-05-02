@@ -90,7 +90,7 @@ export const updateAuthenticatedFetchWithLoginResponse = async (response: Respon
     const updatedBearerToken = response.status === 401
         ? null
         : response.headers.get(AuthHeader);
-    const role = Role.fromStr(await response.json());
+    const role = Role.fromStr(await response.text());
     setter(_ => {
         if (updatedBearerToken && role) {
             TokenAndRole.persist({ token: updatedBearerToken, role });
