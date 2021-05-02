@@ -1,9 +1,9 @@
 package com.lion.rafiki.sql
 
+import cats.effect.MonadCancel
 import doobie.implicits._
 import doobie.implicits.javasql._
 import doobie.implicits.javatimedrivernative._
-import cats.effect.Bracket
 import cats.implicits.toFunctorOps
 import com.lion.rafiki.domain.company.{Form, FormSession}
 import com.lion.rafiki.domain.{Company, CompanyContract}
@@ -53,7 +53,7 @@ private[sql] object FormSessionSQL {
     paginate(pageSize, offset)(allSQL.query[FormSession.Record])
 }
 
-class DoobieFormSessionRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
+class DoobieFormSessionRepo[F[_]: MonadCancel[*[_], Throwable]](val xa: Transactor[F])
   extends FormSession.Repo[F] {
   import FormSessionSQL._
   import com.lion.rafiki.domain.RepoError.ConnectionIOwithErrors

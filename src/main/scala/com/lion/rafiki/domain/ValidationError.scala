@@ -1,6 +1,6 @@
 package com.lion.rafiki.domain
 
-import com.lion.rafiki.auth.AuthError
+import com.lion.rafiki.auth.{AuthError, PasswordError}
 import org.http4s.DecodeFailure
 
 sealed trait ValidationError extends Product with Serializable
@@ -21,4 +21,5 @@ object ValidationError {
   case class Repo(e: RepoError) extends ValidationError
   case class Decoding(e: DecodeFailure) extends ValidationError
   case class Auth(e: AuthError) extends ValidationError
+  case class Password(e: PasswordError) extends ValidationError
 }

@@ -5,7 +5,6 @@ import cats.data.EitherT
 import com.lion.rafiki.domain.{Company, RepoError, TaggedId, User, ValidationError, WithId}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.{Decoder, Encoder}
-import org.http4s.dsl.impl.Path
 
 case class FormSessionInvite[User](user: User, team: String, acceptConditions: Option[Boolean]) {
   def withId(id: FormSessionInvite.Id) = WithId(id, this)
@@ -21,8 +20,6 @@ object FormSessionInvite extends TaggedId[FormSessionInvite[_]] {
   type UpdateRecord = Record
   type Full = WithId[Id, FormSessionInvite[User.Full]]
 
-  implicit val pathDecoder: Decoder[Path] = Decoder[String].map(Path(_))
-  implicit val pathEncoder: Encoder[Path] = Encoder[String].contramap(_.toString)
   implicit def formSessionInviteDecoder[T: Decoder]: Decoder[FormSessionInvite[T]] = deriveDecoder
   implicit def formSessionInviteEncoder[T: Encoder]: Encoder[FormSessionInvite[T]] = deriveEncoder
   implicit val formSessionInviteCreateDecoder: Decoder[Create] = deriveDecoder

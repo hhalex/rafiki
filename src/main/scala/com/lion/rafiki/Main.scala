@@ -1,10 +1,8 @@
 package com.lion.rafiki
 
-import cats.effect.{Blocker, ExitCode, IO, IOApp}
-import cats._
-import cats.data.Kleisli
+import cats.effect.{ExitCode, IO, IOApp}
 import cats.syntax.semigroupk._
-import com.lion.rafiki.auth.{CryptoBits, HotUserStore, PrivateKey, UserAuth}
+import com.lion.rafiki.auth.{CryptoBits, HotUserStore, PasswordHasher, PrivateKey, UserAuth}
 import com.lion.rafiki.domain.company.{Form, FormSession, FormSessionInvite}
 import com.lion.rafiki.domain.{Company, CompanyContract, User}
 import com.lion.rafiki.endpoints.{AuthenticationEndpoints, CompanyBusinessEndpoints, CompanyEndpoints, UserEndpoints}
@@ -18,12 +16,10 @@ import org.http4s.server.blaze.BlazeServerBuilder
 import org.http4s.server.middleware.Logger
 
 import java.time.Clock
-import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.global
 
 object Main extends IOApp {
   def run(args: List[String]) = {
-    implicit val blocker = Blocker.liftExecutionContext(ExecutionContext.global)
 
     for {
       conf <- Stream.eval(Conf[IO]())
@@ -31,15 +27,16 @@ object Main extends IOApp {
         "org.postgresql.Driver",
         conf.dbUrl,
         conf.dbUser,
-        conf.dbPassword,
-        blocker
+        conf.dbPassword
       )
       _ <- Stream.eval(create.allTables.transact(xa))
 
       exitCode <- {
 
+        val passwordHasher = PasswordHasher.bcrypt[IO]()
+
         val userRepo = new DoobieUserRepo[IO](xa)
-        val userService = new User.Service[IO](userRepo)
+        val userService = new User.Service[IO](userRepo, passwordHasher)
         val companyRepo = new DoobieCompanyRepo[IO](xa)
 
         val companyService = new Company.Service[IO](companyRepo, userService)
@@ -63,7 +60,7 @@ object Main extends IOApp {
         val crypto = CryptoBits(privateKey)
         val clock = Clock.systemUTC()
 
-        val hotUserStore = new HotUserStore[IO](conf.hotUsersList)
+        val hotUserStore = new HotUserStore[IO](conf.hotUsersList, passwordHasher)
         val userAuth = new UserAuth[IO](userService, companyRepo, hotUserStore, crypto)
 
         val authEndpoints = new AuthenticationEndpoints[IO]().endpoints(userAuth, clock)

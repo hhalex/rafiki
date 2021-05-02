@@ -1,6 +1,6 @@
 package com.lion.rafiki.auth
 
-import cats.effect.{Blocker, IO, Resource}
+import cats.effect.{IO, Resource}
 import com.lion.rafiki.domain.User
 import doobie.{ExecutionContexts, KleisliInterpreter}
 import doobie.util.transactor.{Strategy, Transactor}

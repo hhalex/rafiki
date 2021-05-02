@@ -1,16 +1,13 @@
 package com.lion.rafiki.sql
 
 import doobie.implicits._
-import cats.data.OptionT
-import cats.effect.Bracket
-import cats.implicits.{catsSyntaxOptionId, toFunctorOps}
-import com.lion.rafiki.domain.User.Id
-import com.lion.rafiki.domain.{Company, User, WithId}
+import cats.effect.MonadCancel
+import cats.implicits._
+import com.lion.rafiki.domain.{Company, User}
 import com.lion.rafiki.sql.SQLPagination.paginate
-import doobie.{ConnectionIO, Transactor}
+import doobie.Transactor
 import doobie.implicits.toSqlInterpolator
 import doobie.util.Read
-import doobie.util.fragments.setOpt
 import doobie.util.meta.Meta
 
 private[sql] object CompanySQL {
@@ -52,7 +49,7 @@ private[sql] object CompanySQL {
     )
 }
 
-class DoobieCompanyRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
+class DoobieCompanyRepo[F[_]: MonadCancel[*[_], Throwable]](val xa: Transactor[F])
   extends Company.Repo[F] {
   import CompanySQL._
   import com.lion.rafiki.domain.RepoError._

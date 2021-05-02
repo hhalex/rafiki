@@ -1,6 +1,6 @@
 package com.lion.rafiki.endpoints
 
-import cats.effect.Sync
+import cats.effect.Async
 import cats.implicits._
 import com.lion.rafiki.auth.{UserAuth, UserCredentials}
 import com.lion.rafiki.domain.ValidationError
@@ -10,15 +10,15 @@ import org.http4s.circe.jsonOf
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, HttpRoutes, Response, Status}
 
-class AuthenticationEndpoints[F[_]: Sync] extends Http4sDsl[F]  {
+class AuthenticationEndpoints[F[_]: Async] extends Http4sDsl[F]  {
   implicit val loginUserDecoder: Decoder[UserCredentials] = deriveDecoder
   implicit val entityLoginUserDecoder: EntityDecoder[F, UserCredentials] = jsonOf[F, UserCredentials]
   def endpoints(userAuth: UserAuth[F], clock: java.time.Clock): HttpRoutes[F] =
     HttpRoutes.of[F] {
       case req @ POST -> Root / "login" =>
-        val action= for {
+        val action = for {
           userCreds <- req.attemptAs[UserCredentials].leftMap(ValidationError.Decoding)
-          user <- userAuth.validateCredentials(userCreds).leftMap[ValidationError](ValidationError.Auth)
+          user <- userAuth.validateCredentials(userCreds)
           userRole <- userAuth.role(user).leftMap[ValidationError](ValidationError.Auth)
         } yield (user, userRole)
 

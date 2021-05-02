@@ -1,14 +1,9 @@
 package com.lion.rafiki.domain
 
-import cats.data.{EitherT, OptionT}
-import cats.{Applicative, Monad}
-import cats.syntax.all._
+import cats.data.EitherT
+import cats.Monad
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
-import shapeless.tag
-import shapeless.tag.@@
-import tsec.passwordhashers.PasswordHasher
-import tsec.passwordhashers.jca.BCrypt
 
 final case class Company[User](name: String, rh_user: User) {
   def withId(id: Company.Id) = WithId(id, this)
@@ -40,7 +35,7 @@ object Company extends TaggedId[Company[_]] {
     def listWithUser(pageSize: Int, offset: Int): Result[List[Full]]
   }
 
-  class Service[F[_]: Monad](companyRepo: Repo[F], userService: User.Service[F])(implicit P: PasswordHasher[F, BCrypt]) {
+  class Service[F[_]: Monad](companyRepo: Repo[F], userService: User.Service[F]) {
     type Result[T] = EitherT[F, ValidationError, T]
     def create(company: Create): Result[Full] =
       for {

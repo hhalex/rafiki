@@ -1,7 +1,7 @@
 package com.lion.rafiki.sql
 
+import cats.effect.MonadCancel
 import doobie.implicits._
-import cats.effect.Bracket
 import cats.implicits.toFunctorOps
 import com.lion.rafiki.domain.company.{FormSession, FormSessionInvite}
 import com.lion.rafiki.domain.User
@@ -10,13 +10,11 @@ import doobie.Transactor
 import doobie.implicits.toSqlInterpolator
 import doobie.util.Read
 import doobie.util.meta.Meta
-import org.http4s.dsl.impl.Path
 
 private[sql] object FormSessionInviteSQL {
   import FormSessionSQL._
   import UserSQL._
   implicit val formSessionInviteIdReader: Meta[FormSessionInvite.Id] = Meta[Long].imap(FormSessionInvite.tagSerial)(_.asInstanceOf[Long])
-  implicit val pathReader: Meta[Path] = Meta[String].imap(Path(_))(_.toString)
   implicit val formSessionInviteFullReader: Read[FormSessionInvite.Full] = Read[(FormSessionInvite.Record, User.Record)].map({
     case (invite, user) => invite.mapData(_.copy(user = user))
   })
@@ -47,7 +45,7 @@ private[sql] object FormSessionInviteSQL {
     paginate(pageSize, offset)(listFullInvitesFragment.query[(FormSession.Id, FormSessionInvite.RecordWithEmail)])
 }
 
-class DoobieFormSessionInviteRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
+class DoobieFormSessionInviteRepo[F[_]: MonadCancel[*[_], Throwable]](val xa: Transactor[F])
   extends FormSessionInvite.Repo[F] {
   import FormSessionInviteSQL._
   import com.lion.rafiki.domain.RepoError._

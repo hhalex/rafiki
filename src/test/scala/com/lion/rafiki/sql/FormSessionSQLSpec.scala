@@ -1,18 +1,17 @@
 package com.lion.rafiki.sql
 
-import cats.effect.{Blocker, IO}
+import cats.effect.unsafe.implicits.global
+import cats.effect.IO
 import com.lion.rafiki.Conf
 import com.lion.rafiki.domain.{Company, CompanyContract}
 import com.lion.rafiki.domain.company.{Form, FormSession}
 import doobie.implicits._
 import doobie.specs2._
-import doobie.util.ExecutionContexts
 import doobie.util.transactor.Transactor
 import org.specs2.mutable.Specification
 
 object FormSessionSQLSpec extends Specification with IOChecker {
 
-  implicit val cs = IO.contextShift(ExecutionContexts.synchronous)
   val conf = Conf[IO]().unsafeRunSync()
 
   val transactor = {
@@ -20,8 +19,7 @@ object FormSessionSQLSpec extends Specification with IOChecker {
       "org.postgresql.Driver",
       conf.dbUrl,
       conf.dbUser,
-      conf.dbPassword,
-      Blocker.liftExecutionContext(ExecutionContexts.synchronous)
+      conf.dbPassword
     )
     create.allTables.transact(xa).unsafeRunSync()
     xa

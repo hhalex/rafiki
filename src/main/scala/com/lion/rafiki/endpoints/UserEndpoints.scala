@@ -1,15 +1,13 @@
 package com.lion.rafiki.endpoints
 
-import cats.effect.Sync
+import cats.effect.Async
 import cats.syntax.all._
-import com.lion.rafiki.auth.{UserAuth, UserCredentials}
+import com.lion.rafiki.auth.UserAuth
 import com.lion.rafiki.domain.{User, ValidationError}
-import com.lion.rafiki.domain.company.Form
-import org.http4s.{AuthedRoutes, EntityDecoder, HttpRoutes, Response, Status}
+import org.http4s.{AuthedRoutes, HttpRoutes}
 import org.http4s.dsl.Http4sDsl
-import org.http4s.server.Router
 
-class UserEndpoints[F[_]: Sync] extends Http4sDsl[F] {
+class UserEndpoints[F[_]: Async] extends Http4sDsl[F] {
   import Pagination._, org.http4s.circe.CirceEntityDecoder._, org.http4s.circe.CirceEntityEncoder._
 
   val UserRoute = "user"

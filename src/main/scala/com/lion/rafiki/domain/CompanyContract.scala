@@ -4,14 +4,8 @@ import cats.Monad
 import cats.data.EitherT
 import cats.implicits.{toBifunctorOps, toFunctorOps}
 import com.lion.rafiki.domain
-import com.lion.rafiki.domain.company.Form
-import com.lion.rafiki.domain.company.Form.Repo
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
-import shapeless.tag
-import shapeless.tag.@@
-import tsec.passwordhashers.PasswordHasher
-import tsec.passwordhashers.jca.BCrypt
 
 final case class CompanyContract[Company](company: Company, kind: CompanyContract.Kind) {
   def withId(id: CompanyContract.Id) = WithId(id, this)
@@ -80,7 +74,7 @@ object CompanyContract extends TaggedId[CompanyContract[_]] {
     } yield repoContract
   }
 
-  class Service[F[_]: Monad](companyContractRepo: Repo[F])(implicit P: PasswordHasher[F, BCrypt]) {
+  class Service[F[_]: Monad](companyContractRepo: Repo[F]) {
     type Result[T] = EitherT[F, ValidationError, T]
     def create(companyContract: CreateRecord): Result[Record] =
       companyContractRepo.create(companyContract).leftMap[ValidationError](ValidationError.Repo)

@@ -1,14 +1,12 @@
 package com.lion.rafiki.sql
 
+import cats.effect.MonadCancel
 import doobie.implicits._
-import cats.data.OptionT
-import cats.effect.Bracket
-import cats.implicits.toFunctorOps
-import com.lion.rafiki.domain
+import cats.implicits._
 import com.lion.rafiki.domain.{Company, CompanyContract}
 import com.lion.rafiki.sql.SQLPagination.paginate
 import doobie.Transactor
-import doobie.implicits.toSqlInterpolator
+import doobie.implicits._
 import doobie.util.meta.Meta
 
 private[sql] object CompanyContractSQL {
@@ -44,7 +42,7 @@ private[sql] object CompanyContractSQL {
     paginate(pageSize, offset)(byCompanyIdQ(companyId))
 }
 
-class DoobieCompanyContractRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
+class DoobieCompanyContractRepo[F[_]: MonadCancel[*[_], Throwable]](val xa: Transactor[F])
   extends CompanyContract.Repo[F] {
   import CompanyContractSQL._
   import com.lion.rafiki.domain.RepoError.ConnectionIOwithErrors

@@ -3,18 +3,17 @@ package com.lion.rafiki.sql
 import doobie._
 import doobie.implicits._
 import Fragments.setOpt
-import cats.effect.Bracket
+import cats.effect.MonadCancel
 import cats.implicits.{catsSyntaxOptionId, toFunctorOps}
+import com.lion.rafiki.auth.PasswordHasher
 import com.lion.rafiki.domain.{RepoError, User}
 import com.lion.rafiki.sql.SQLPagination.paginate
 import doobie.util.meta.Meta
-import tsec.passwordhashers.PasswordHash
-import tsec.passwordhashers.jca.BCrypt
 
 private[sql] object UserSQL {
 
   implicit val userIdReader: Meta[User.Id] = Meta[Long].imap(User.tagSerial)(_.asInstanceOf[Long])
-  implicit val passwordReader: Meta[PasswordHash[BCrypt]] = Meta[String].imap(PasswordHash[BCrypt])(_.toString)
+  implicit val passwordReader: Meta[PasswordHasher.Password] = Meta[String].imap(PasswordHasher.tagString)(_.asInstanceOf[String])
   implicit val han = LogHandler.jdkLogHandler
 
   def byIdQ(id: User.Id) = sql"SELECT * FROM users WHERE id=$id".query[User.Record]
@@ -22,11 +21,11 @@ private[sql] object UserSQL {
   def byEmailQ(email: String) =
     sql"SELECT * FROM users WHERE email=$email".query[User.Record]
 
-  def insertQ(email: String, passwordHash: PasswordHash[BCrypt]) =
+  def insertQ(email: String, passwordHash: PasswordHasher.Password) =
     sql"INSERT INTO users (email, password) VALUES ($email, $passwordHash)"
       .update
 
-  def updateQ(id: User.Id, email: Option[String], passwordHash: Option[PasswordHash[BCrypt]]) = {
+  def updateQ(id: User.Id, email: Option[String], passwordHash: Option[PasswordHasher.Password]) = {
     val set = setOpt(
       email.map(e => fr"email = $e"),
       passwordHash.map(p => fr"password = $p")
@@ -45,7 +44,7 @@ private[sql] object UserSQL {
   )
 }
 
-class DoobieUserRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
+class DoobieUserRepo[F[_]: MonadCancel[*[_], Throwable]](val xa: Transactor[F])
   extends User.Repo[F] {
   import UserSQL._
   import RepoError._
@@ -58,7 +57,7 @@ class DoobieUserRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
       .transact(xa)
 
 
-  override def update(user: User.withId[Option[PasswordHash[BCrypt]]]): Result[User.Record] =
+  override def update(user: User.withId[Option[PasswordHasher.Password]]): Result[User.Record] =
       updateQ(user.id, user.data.username.some, user.data.password).run
         .flatMap(_ => byIdQ(user.id).option)
         .toResult()

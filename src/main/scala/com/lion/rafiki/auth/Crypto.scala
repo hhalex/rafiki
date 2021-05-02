@@ -1,19 +1,24 @@
 package com.lion.rafiki.auth
 
-import org.apache.commons.codec.binary.Hex
-
-import java.nio.charset.Charset
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
 case class PrivateKey(key: Array[Byte])
 
 case class CryptoBits(key: PrivateKey) {
+  private def convertBytesToHex(bytes: Seq[Byte]): String = {
+    val sb = new StringBuilder
+    for (b <- bytes) {
+      sb.append(String.format("%02x", Byte.box(b)))
+    }
+    sb.toString
+  }
+
   import java.util.Base64
-  def sign(message: String): String = {
+  private def sign(message: String): String = {
     val mac = Mac.getInstance("HmacSHA1")
     mac.init(new SecretKeySpec(key.key, "HmacSHA1"))
-    Hex.encodeHexString(mac.doFinal(message.getBytes("utf-8")))
+    convertBytesToHex(mac.doFinal(message.getBytes("utf-8")).toIndexedSeq)
   }
 
   def signToken(token: String, nonce: String): String = {
@@ -33,7 +38,7 @@ case class CryptoBits(key: PrivateKey) {
     }
   }
 
-  def constantTimeEquals(a: String, b: String): Boolean = {
+  private def constantTimeEquals(a: String, b: String): Boolean = {
     var equal = 0
     for (i <- 0 until (a.length min b.length)) {
       equal |= a(i) ^ b(i)

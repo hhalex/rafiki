@@ -4,33 +4,31 @@ import cats.effect.Sync
 import cats.syntax.all._
 import cats.{Applicative, Monad}
 import cats.data.{EitherT, Kleisli, OptionT}
-import tsec.passwordhashers.jca.BCrypt
-import com.lion.rafiki.domain.{Company, User}
+import com.lion.rafiki.domain.{Company, User, ValidationError}
 import org.http4s.dsl._
 import org.http4s.{AuthScheme, AuthedRequest, AuthedRoutes, Credentials, Request, Response, Status}
 import org.http4s.headers.Authorization
 import org.http4s.server.AuthMiddleware
-import tsec.passwordhashers.PasswordHasher
 
 // For admin users
-class HotUserStore[F[_]: Monad](hotUsers: Seq[UserCredentials])(implicit P: PasswordHasher[F, BCrypt]) {
+class HotUserStore[F[_]: Monad](hotUsers: Seq[UserCredentials], passwordHasher: PasswordHasher[F]) {
   // A hot user is a user generated at startup time.
-  private def newHotUser(username: String, password: String)(implicit P: PasswordHasher[F, BCrypt]) = {
+  private def newHotUser(username: String, password: String) = {
     Applicative[F].map2(
       username.pure[F],
-      BCrypt.hashpw[F](password)
+      passwordHasher.hashPwd(password).value
     )((_, _))
   }
   val hotUsersList = hotUsers
     .traverse(u => newHotUser(u.username, u.password))
-    .map(_.toList)
+    .map(_.toList.collect({ case (username, Right(pass)) => (username, pass) }))
 
   def isMember(u: User.Authed) = OptionT(hotUsersList.map(_.find(_._1 == u.email))).as(u)
 
-  def validateCredentials(creds: UserCredentials): OptionT[F, User.Authed] = for {
-    user <- OptionT(hotUsersList.map(_.find(_._1 == creds.username)))
-    isValidPassword <- OptionT.liftF(BCrypt.checkpwBool[F](creds.password, user._2))
-    _ <- OptionT.fromOption[F](if (isValidPassword) user._1.some else None)
+  def validateCredentials(creds: UserCredentials): EitherT[F, AuthError, User.Authed] = for {
+    user <- EitherT.fromOptionF(hotUsersList.map(_.find(_._1 == creds.username)), AuthError.UserNotFound)
+    isValidPassword <- passwordHasher.checkPwd(creds.password, user._2).leftMap[AuthError](AuthError.Password)
+    _ <- EitherT.fromOption(if (isValidPassword) user._1.some else None, AuthError.InvalidPassword: AuthError)
   } yield User.Authed(user._1)
 }
 
@@ -38,12 +36,12 @@ class UserAuth[F[_]: Sync](userService: User.Service[F], companyRepo: Company.Re
 
   type Result[T] = EitherT[F, AuthError, T]
 
-  def validateCredentials(creds: UserCredentials): Result[User.Authed] =
-    hotUserStore.validateCredentials(creds).orElse(
-      userService.validateCredentials(creds.username, creds.password)
-        .toOption
-        .map(u => User.Authed(u.data.username))
-    ).toRight[AuthError](AuthError.InvalidCredentials)
+  def validateCredentials(creds: UserCredentials): EitherT[F, ValidationError, User.Authed] =
+    hotUserStore.validateCredentials(creds).leftMap[ValidationError](ValidationError.Auth)
+      .orElse(
+        userService.validateCredentials(creds.username, creds.password)
+         .map(u => User.Authed(u.data.username))
+      )
 
   def embedAuthHeader(r: Response[F], u: User.Authed, time: String): Response[F] = {
     val message = crypto.signToken(u.email, time)
@@ -56,7 +54,7 @@ class UserAuth[F[_]: Sync](userService: User.Service[F], companyRepo: Company.Re
 
   private val auth: Kleisli[Result[*], Request[F], User.Authed] = Kleisli { (request: Request[F]) => EitherT.fromEither[F] {
     for {
-      header <- request.headers.get(Authorization).toRight[AuthError](AuthError.AuthorizationTokenNotFound)
+      header <- request.headers.get[Authorization].toRight[AuthError](AuthError.AuthorizationTokenNotFound)
       userEmail <- crypto.validateSignedToken(header.credentials.asInstanceOf[Credentials.Token].token).toRight[AuthError](AuthError.InvalidToken)
     } yield User.Authed(userEmail)
   }}

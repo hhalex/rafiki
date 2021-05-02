@@ -2,7 +2,7 @@ package com.lion.rafiki.sql
 
 import doobie.implicits._
 import cats.implicits._
-import cats.effect.Bracket
+import cats.effect.MonadCancel
 import cats.implicits.toFunctorOps
 import com.lion.rafiki.domain.company.Form
 import com.lion.rafiki.domain.{Company, RepoError}
@@ -277,7 +277,7 @@ private[sql] object FormSQL {
 
 }
 
-class DoobieFormRepo[F[_]: Bracket[*[_], Throwable]](val xa: Transactor[F])
+class DoobieFormRepo[F[_]: MonadCancel[*[_], Throwable]](val xa: Transactor[F])
   extends Form.Repo[F] {
   import FormSQL._
   import RepoError.ConnectionIOwithErrors
