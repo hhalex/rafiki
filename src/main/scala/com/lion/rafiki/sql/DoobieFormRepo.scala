@@ -18,9 +18,9 @@ import doobie.util.query.Query0
 
 private[sql] object FormSQL {
   import CompanySQL._
-  implicit val formIdReader: Meta[Form.Id] = Meta[Long].imap(Form.tagSerial)(_.asInstanceOf[Long])
-  implicit val formTreeIdMeta: Meta[Form.Tree.Id] = Meta[Long].imap(Form.Tree.tagSerial)(_.asInstanceOf[Long])
-  implicit val formTreeQuestionAnswerIdMeta: Meta[Form.Tree.Question.Answer.Id] = Meta[Long].imap(Form.Tree.Question.Answer.tagSerial)(_.asInstanceOf[Long])
+  implicit val formIdReader: Meta[Form.Id] = createMetaId(Form)
+  implicit val formTreeIdMeta: Meta[Form.Tree.Id] = createMetaId(Form.Tree)
+  implicit val formTreeQuestionAnswerIdMeta: Meta[Form.Tree.Question.Answer.Id] = createMetaId(Form.Tree.Question.Answer)
   implicit val formTreeKindMeta: Meta[Form.Tree.Kind] = pgEnumStringOpt("form_tree_constr", s => Form.Tree.Kind.fromStringE(s).toOption, _.toString.toLowerCase)
   implicit val formRecordReader: Read[Form.Record] = Read[(Form.Id, Option[Company.Id], String, Option[String], Option[Form.Tree.Id], Option[Form.Tree.Kind])]
     .map({ case (id, company, name, description, tree_id, tree_kind) =>
@@ -36,7 +36,7 @@ private[sql] object FormSQL {
     case (id, label, text) => Form.Tree.QuestionWithKey(id, label, text, Nil)
   })
 
-  implicit val han = LogHandler.jdkLogHandler
+  implicit val han: LogHandler = LogHandler.jdkLogHandler
 
   def byIdQ(id: Form.Id) =
     sql"""SELECT * FROM forms WHERE id=$id""".query[Form.Record]
@@ -277,7 +277,7 @@ private[sql] object FormSQL {
 
 }
 
-class DoobieFormRepo[F[_]: MonadCancel[*[_], Throwable]](val xa: Transactor[F])
+class DoobieFormRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
   extends Form.Repo[F] {
   import FormSQL._
   import RepoError.ConnectionIOwithErrors

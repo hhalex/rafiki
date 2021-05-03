@@ -14,8 +14,8 @@ class CompanyEndpoints[F[_]: Async] extends Http4sDsl[F] {
   val CompanyRoute = "company"
   val CompanyContractRoute = "contract"
 
-  object CompanyIdVar extends IdVar[Company.Id](Company.tagSerial)
-  object CompanyContractIdVar extends IdVar[CompanyContract.Id](CompanyContract.tagSerial)
+  object CompanyIdVar extends IdVar[Company.Id](Company.tag)
+  object CompanyContractIdVar extends IdVar[CompanyContract.Id](CompanyContract.tag)
 
   def endpoints(companyService: Company.Service[F], companyContractService: CompanyContract.Service[F], userAuth: UserAuth[F]): HttpRoutes[F] =
     userAuth.authAdmin {

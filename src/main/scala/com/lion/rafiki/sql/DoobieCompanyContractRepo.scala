@@ -11,7 +11,7 @@ import doobie.util.meta.Meta
 
 private[sql] object CompanyContractSQL {
   import CompanySQL._
-  implicit val companyContractIdMeta: Meta[CompanyContract.Id] = Meta[Long].imap(CompanyContract.tagSerial)(_.asInstanceOf[Long])
+  implicit val companyContractIdMeta: Meta[CompanyContract.Id] = createMetaId(CompanyContract)
   implicit val companyContractKindMeta: Meta[CompanyContract.Kind] = Meta[String].imap(CompanyContract.Kind.fromString)(_.toString)
 
   def byIdQ(id: CompanyContract.Id) =
@@ -42,7 +42,7 @@ private[sql] object CompanyContractSQL {
     paginate(pageSize, offset)(byCompanyIdQ(companyId))
 }
 
-class DoobieCompanyContractRepo[F[_]: MonadCancel[*[_], Throwable]](val xa: Transactor[F])
+class DoobieCompanyContractRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
   extends CompanyContract.Repo[F] {
   import CompanyContractSQL._
   import com.lion.rafiki.domain.RepoError.ConnectionIOwithErrors

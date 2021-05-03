@@ -2,3 +2,7 @@
 target
 ui/node_modules
 ui/build
+.metals/
+.bloop/
+.ammonite/
+metals.sbt

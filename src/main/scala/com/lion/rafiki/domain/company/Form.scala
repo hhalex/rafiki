@@ -12,7 +12,7 @@ case class Form[T](company: Option[Company.Id], name: String, description: Optio
   def withId(id: Form.Id) = WithId(id, this)
 }
 
-object Form extends TaggedId[Form[_]] {
+object Form extends TaggedId {
   sealed trait Tree {
     val kind = this match {
       case _: Tree.Text | _: Tree.TextWithKey => Tree.Kind.Text
@@ -26,7 +26,7 @@ object Form extends TaggedId[Form[_]] {
     val key = (id, kind)
   }
 
-  object Tree extends TaggedId[Tree] {
+  object Tree extends TaggedId {
     import io.circe.generic.auto._
 
     sealed trait Kind
@@ -81,7 +81,7 @@ object Form extends TaggedId[Form[_]] {
       sealed trait AnswerWithId extends Answer {
         val id: Answer.Id
       }
-      object Answer extends TaggedId[Answer] {
+      object Answer extends TaggedId {
 
         case class FreeText(label: Option[String]) extends Answer {
           override def withId(id: Id) = FreeTextWithId(id, label)

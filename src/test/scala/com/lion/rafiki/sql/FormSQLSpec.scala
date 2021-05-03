@@ -28,10 +28,10 @@ object FormSQLSpec extends Specification with IOChecker {
 
   import FormSQL._
 
-  val formId = Form.tagSerial(2)
-  val treeId = Form.Tree.tagSerial(2)
+  val formId = Form.tag(2)
+  val treeId = Form.Tree.tag(2)
   val treeKey = (treeId, Form.Tree.Kind.Group)
-  val companyId = Company.tagSerial(2)
+  val companyId = Company.tag(2)
 
   check(byIdQ(formId))
   check(getTreeQuestionQ(treeId))

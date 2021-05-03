@@ -17,10 +17,9 @@ class CompanyBusinessEndpoints[F[_]: Async] extends Http4sDsl[F] {
   val FormRoute = "form"
   val SessionRoute = "session"
   val InviteRoute = "invite"
-
-  object FormIdVar extends IdVar[Form.Id](Form.tagSerial)
-  object FormSessionIdVar extends IdVar[FormSession.Id](FormSession.tagSerial)
-  object FormSessionInviteIdVar extends IdVar[FormSessionInvite.Id](FormSessionInvite.tagSerial)
+  object FormIdVar extends IdVar[Form.Id](Form.tag)
+  object FormSessionIdVar extends IdVar[FormSession.Id](FormSession.tag)
+  object FormSessionInviteIdVar extends IdVar[FormSessionInvite.Id](FormSessionInvite.tag)
 
   def endpoints(formService: Form.Service[F],
                 formSessionService: FormSession.Service[F],

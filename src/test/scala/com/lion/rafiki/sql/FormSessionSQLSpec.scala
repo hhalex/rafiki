@@ -26,10 +26,10 @@ object FormSessionSQLSpec extends Specification with IOChecker {
   }
 
   import FormSessionSQL._
-  val companyContractId = CompanyContract.tagSerial(2)
-  val formSessionId = FormSession.tagSerial(2)
-  val formId = Form.tagSerial(2)
-  val companyId = Company.tagSerial(2)
+  val companyContractId = CompanyContract.tag(2)
+  val formSessionId = FormSession.tag(2)
+  val formId = Form.tag(2)
+  val companyId = Company.tag(2)
 
   check(byIdQ(formSessionId))
   check(insertQ(companyContractId, formId, "name", None, None))

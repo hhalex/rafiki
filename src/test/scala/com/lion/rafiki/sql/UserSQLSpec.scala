@@ -27,12 +27,12 @@ object UserSQLSpec extends Specification with IOChecker {
   }
 
   import UserSQL._
-  val companyId = Company.tagSerial(2)
-  val userId = User.tagSerial(2)
+  val companyId = Company.tag(2)
+  val userId = User.tag(2)
 
   check(byIdQ(userId))
   check(byEmailQ("email"))
-  check(insertQ("name", PasswordHasher.tagString("my password")))
+  check(insertQ("name", PasswordHasher.tag("my password")))
   check(updateQ(userId, "email".some, None))
   check(deleteQ(userId))
   check(listAllQ(10, 10))

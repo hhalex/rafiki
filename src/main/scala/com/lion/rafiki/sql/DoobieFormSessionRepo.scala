@@ -15,12 +15,11 @@ import doobie.util.meta.Meta
 import java.time.LocalDateTime
 
 private[sql] object FormSessionSQL {
-  import CompanyContractSQL.companyContractIdMeta
-  import CompanySQL.companyIdReader
+  import CompanyContractSQL._
+  import CompanySQL._
   import FormSQL._
-  implicit val formSessionIdReader: Meta[FormSession.Id] = Meta[Long].imap(FormSession.tagSerial)(_.asInstanceOf[Long])
-
-  implicit val han = LogHandler.jdkLogHandler
+  implicit val formSessionIdReader: Meta[FormSession.Id] = Meta[Long].imap(FormSession.tag)(FormSession.unTag)
+  implicit val han: LogHandler = LogHandler.jdkLogHandler
 
   def byIdQ(id: FormSession.Id) =
     sql"""SELECT id, form_id, name, start_date, end_date FROM form_sessions WHERE id=$id""".query[FormSession.Record]
@@ -53,7 +52,7 @@ private[sql] object FormSessionSQL {
     paginate(pageSize, offset)(allSQL.query[FormSession.Record])
 }
 
-class DoobieFormSessionRepo[F[_]: MonadCancel[*[_], Throwable]](val xa: Transactor[F])
+class DoobieFormSessionRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
   extends FormSession.Repo[F] {
   import FormSessionSQL._
   import com.lion.rafiki.domain.RepoError.ConnectionIOwithErrors

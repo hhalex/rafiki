@@ -14,7 +14,7 @@ import doobie.util.meta.Meta
 private[sql] object FormSessionInviteSQL {
   import FormSessionSQL._
   import UserSQL._
-  implicit val formSessionInviteIdReader: Meta[FormSessionInvite.Id] = Meta[Long].imap(FormSessionInvite.tagSerial)(_.asInstanceOf[Long])
+  implicit val formSessionInviteIdReader: Meta[FormSessionInvite.Id] = createMetaId(FormSessionInvite)
   implicit val formSessionInviteFullReader: Read[FormSessionInvite.Full] = Read[(FormSessionInvite.Record, User.Record)].map({
     case (invite, user) => invite.mapData(_.copy(user = user))
   })
@@ -45,7 +45,7 @@ private[sql] object FormSessionInviteSQL {
     paginate(pageSize, offset)(listFullInvitesFragment.query[(FormSession.Id, FormSessionInvite.RecordWithEmail)])
 }
 
-class DoobieFormSessionInviteRepo[F[_]: MonadCancel[*[_], Throwable]](val xa: Transactor[F])
+class DoobieFormSessionInviteRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
   extends FormSessionInvite.Repo[F] {
   import FormSessionInviteSQL._
   import com.lion.rafiki.domain.RepoError._

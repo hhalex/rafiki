@@ -52,17 +52,17 @@ class UserAuth[F[_]: Sync](userService: User.Service[F], companyRepo: Company.Re
     resolveAdmin.as("Admin").run(u)
       .orElse(resolveCompany.as("Company").run(u))
 
-  private val auth: Kleisli[Result[*], Request[F], User.Authed] = Kleisli { (request: Request[F]) => EitherT.fromEither[F] {
+  private val auth: Kleisli[Result, Request[F], User.Authed] = Kleisli { (request: Request[F]) => EitherT.fromEither[F] {
     for {
       header <- request.headers.get[Authorization].toRight[AuthError](AuthError.AuthorizationTokenNotFound)
       userEmail <- crypto.validateSignedToken(header.credentials.asInstanceOf[Credentials.Token].token).toRight[AuthError](AuthError.InvalidToken)
     } yield User.Authed(userEmail)
   }}
 
-  private val resolveAdmin: Kleisli[Result[*], User.Authed, User.Authed] =
+  private val resolveAdmin: Kleisli[Result, User.Authed, User.Authed] =
     Kleisli { m => hotUserStore.isMember(m).toRight[AuthError](AuthError.AdminAuthError) }
 
-  private val resolveCompany: Kleisli[Result[*], User.Authed, Company.Record] =
+  private val resolveCompany: Kleisli[Result, User.Authed, Company.Record] =
     Kleisli { (authed: User.Authed) =>
       companyRepo.getByUserEmail(authed.email).leftMap[AuthError](AuthError.CompanyAuthError)
     }
@@ -80,7 +80,7 @@ object UserAuth {
     val dsl = new Http4sDsl[F] {}
     import dsl._
 
-    Kleisli { req: AuthedRequest[F, AuthError] =>
+    Kleisli { (req: AuthedRequest[F, AuthError]) =>
       // for any requests' auth failure we return 401
       req.req match {
         case _ =>
@@ -90,5 +90,4 @@ object UserAuth {
       }
     }
   }
-
 }

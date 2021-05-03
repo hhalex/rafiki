@@ -3,8 +3,6 @@ package com.lion.rafiki.auth
 import cats.Applicative
 import cats.data.EitherT
 import cats.syntax.all._
-import shapeless.tag
-import shapeless.tag.@@
 
 import scala.util.{Failure, Success, Try}
 
@@ -14,14 +12,14 @@ trait PasswordHasher[F[_]] {
 }
 
 object PasswordHasher {
-  type Password = String @@ PasswordHasher[Option]
-  val tagString = tag[PasswordHasher[Option]](_: String)
+  opaque type Password = String
+  val tag: String => Password = _.asInstanceOf[Password]
 
   import com.github.t3hnar.bcrypt._
 
   def bcrypt[F[_]: Applicative](): PasswordHasher[F] = new PasswordHasher[F] {
     override def hashPwd(clearPassword: String) = clearPassword.bcryptSafeBounded match {
-      case Success(value) => EitherT.rightT[F, PasswordError](tagString(value))
+      case Success(value) => EitherT.rightT[F, PasswordError](tag(value))
       case Failure(exception) => EitherT.leftT[F, Password](PasswordError.EncodingError(exception.getMessage))
     }
     override def checkPwd(clearPassword: String, crypted: Password) = clearPassword.isBcryptedSafeBounded(crypted) match {

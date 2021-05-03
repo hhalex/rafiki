@@ -1,13 +1,11 @@
 package com.lion.rafiki.domain
 
 import io.circe.{Decoder, Encoder}
-import shapeless.tag
-import shapeless.tag.@@
+trait TaggedId {
+  case class Id(value: Long)
+  def tag(t: Long): Id = Id(t)
+  def unTag(id: Id): Long = id.value
 
-trait TaggedId[T] {
-  type Id = Long @@ T
-  val tagSerial = tag[T](_: Long)
-
-  implicit val formSessionIdDecoder: Decoder[Id] = Decoder[Long].map(tagSerial)
-  implicit val formSessionIdEncoder: Encoder[Id] = Encoder[Long].contramap(_.asInstanceOf[Long])
+  implicit val taggedIdDecoder: Decoder[Id] = Decoder[Long].map(tag)
+  implicit val taggedIdEncoder: Encoder[Id] = Encoder[Long].contramap(unTag)
 }

@@ -9,7 +9,7 @@ final case class Company[User](name: String, rh_user: User) {
   def withId(id: Company.Id) = WithId(id, this)
 }
 
-object Company extends TaggedId[Company[_]] {
+object Company extends TaggedId {
 
   implicit def companyDecoder[T: Decoder]: Decoder[Company[T]] = deriveDecoder
   implicit def companyEncoder[T: Encoder]: Encoder[Company[T]] = deriveEncoder

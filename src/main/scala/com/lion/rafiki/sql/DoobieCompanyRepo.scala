@@ -1,7 +1,6 @@
 package com.lion.rafiki.sql
 
 import doobie.implicits._
-import cats.effect.MonadCancel
 import cats.implicits._
 import com.lion.rafiki.domain.{Company, User}
 import com.lion.rafiki.sql.SQLPagination.paginate
@@ -9,11 +8,13 @@ import doobie.Transactor
 import doobie.implicits.toSqlInterpolator
 import doobie.util.Read
 import doobie.util.meta.Meta
+import cats.Show.Shown.mat
+import doobie.syntax.SqlInterpolator.SingleFragment.fromPut
 
 private[sql] object CompanySQL {
   import UserSQL._
-  implicit val companyIdReader: Meta[Company.Id] = Meta[Long].imap(Company.tagSerial)(_.asInstanceOf[Long])
-  implicit val companyWithUserReader: Read[Company.Full] = Read[(Company.Record, User.Record)].map(pair => pair._1.mapData(_.copy(rh_user = pair._2.data)))
+  implicit val companyIdReader: Meta[Company.Id] = createMetaId(Company)
+  implicit val companyWithUserReader: Read[Company.Full] = Read[(Company.Record, User.Record)].map((one, two) => one.mapData(_.copy(rh_user = two.data)))
 
   def byIdQ(id: Company.Id) =
     sql"""SELECT * FROM companies WHERE id=$id""".query[Company.Record]
@@ -49,7 +50,7 @@ private[sql] object CompanySQL {
     )
 }
 
-class DoobieCompanyRepo[F[_]: MonadCancel[*[_], Throwable]](val xa: Transactor[F])
+class DoobieCompanyRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
   extends Company.Repo[F] {
   import CompanySQL._
   import com.lion.rafiki.domain.RepoError._

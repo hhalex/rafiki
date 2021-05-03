@@ -25,8 +25,8 @@ object CompanyContractSQLSpec extends Specification with IOChecker {
   }
 
   import CompanyContractSQL._
-  val companyId = Company.tagSerial(2)
-  val companyContractId = CompanyContract.tagSerial(2)
+  val companyId = Company.tag(2)
+  val companyContractId = CompanyContract.tag(2)
 
   check(byIdQ(companyContractId))
   check(byCompanyIdQ(companyId))

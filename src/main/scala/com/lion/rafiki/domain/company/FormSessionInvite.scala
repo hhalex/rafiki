@@ -10,7 +10,7 @@ case class FormSessionInvite[User](user: User, team: String, acceptConditions: O
   def withId(id: FormSessionInvite.Id) = WithId(id, this)
 }
 
-object FormSessionInvite extends TaggedId[FormSessionInvite[_]] {
+object FormSessionInvite extends TaggedId {
 
   type Create = FormSessionInvite[User.Create]
   type CreateRecord = FormSessionInvite[User.Id]

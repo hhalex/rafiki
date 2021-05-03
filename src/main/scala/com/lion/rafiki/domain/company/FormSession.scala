@@ -14,7 +14,7 @@ case class FormSession(formId: Form.Id, name: String, startDate: Option[LocalDat
   def withId(id: FormSession.Id) = WithId(id, this)
 }
 
-object FormSession extends TaggedId[FormSession] {
+object FormSession extends TaggedId {
 
   type Create = FormSession
   type Update = WithId[Id, Create]

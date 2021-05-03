@@ -12,9 +12,9 @@ import doobie.util.meta.Meta
 
 private[sql] object UserSQL {
 
-  implicit val userIdReader: Meta[User.Id] = Meta[Long].imap(User.tagSerial)(_.asInstanceOf[Long])
-  implicit val passwordReader: Meta[PasswordHasher.Password] = Meta[String].imap(PasswordHasher.tagString)(_.asInstanceOf[String])
-  implicit val han = LogHandler.jdkLogHandler
+  implicit val userIdReader: Meta[User.Id] = Meta[Long].imap(User.tag)(User.unTag)
+  implicit val passwordReader: Meta[PasswordHasher.Password] = createMetaPasswd()
+  implicit val han: LogHandler = LogHandler.jdkLogHandler
 
   def byIdQ(id: User.Id) = sql"SELECT * FROM users WHERE id=$id".query[User.Record]
 
@@ -44,7 +44,7 @@ private[sql] object UserSQL {
   )
 }
 
-class DoobieUserRepo[F[_]: MonadCancel[*[_], Throwable]](val xa: Transactor[F])
+class DoobieUserRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
   extends User.Repo[F] {
   import UserSQL._
   import RepoError._

@@ -27,9 +27,9 @@ object FormSessionInviteSQLSpec extends Specification with IOChecker {
   }
 
   import FormSessionInviteSQL._
-  val formSessionInviteId = FormSessionInvite.tagSerial(2)
-  val formSessionId = FormSession.tagSerial(2)
-  val userId = User.tagSerial(2)
+  val formSessionInviteId = FormSessionInvite.tag(2)
+  val formSessionId = FormSession.tag(2)
+  val userId = User.tag(2)
 
   check(byIdQ(formSessionInviteId))
   check(byFormSessionQ(formSessionId))
