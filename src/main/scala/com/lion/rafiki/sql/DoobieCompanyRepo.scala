@@ -14,7 +14,10 @@ import doobie.syntax.SqlInterpolator.SingleFragment.fromPut
 private[sql] object CompanySQL {
   import UserSQL._
   implicit val companyIdReader: Meta[Company.Id] = createMetaId(Company)
-  implicit val companyWithUserReader: Read[Company.Full] = Read[(Company.Record, User.Record)].map((one, two) => one.mapData(_.copy(rh_user = two.data)))
+  implicit val companyWithUserReader: Read[Company.Full] =
+    Read[(Company.Record, User.Record)].map((one, two) =>
+      one.mapData(_.copy(rh_user = two.data))
+    )
 
   def byIdQ(id: Company.Id) =
     sql"""SELECT * FROM companies WHERE id=$id""".query[Company.Record]
@@ -23,20 +26,18 @@ private[sql] object CompanySQL {
     sql"""SELECT * FROM companies WHERE rh_user=$id""".query[Company.Record]
 
   def byUserEmailQ(email: String) =
-    sql"""SELECT * FROM companies c LEFT JOIN users u ON c.rh_user = u.id WHERE u.email = $email""".query[Company.Record]
+    sql"""SELECT * FROM companies c LEFT JOIN users u ON c.rh_user = u.id WHERE u.email = $email"""
+      .query[Company.Record]
 
   def insertQ(name: String, rh_user: User.Id) =
-    sql"""INSERT INTO companies (name,rh_user) VALUES ($name,$rh_user)"""
-      .update
+    sql"""INSERT INTO companies (name,rh_user) VALUES ($name,$rh_user)""".update
 
   def updateQ(id: Company.Id, name: String) = {
-    (sql"UPDATE companies SET name=$name WHERE id=$id")
-      .update
+    (sql"UPDATE companies SET name=$name WHERE id=$id").update
   }
 
   def deleteQ(id: Company.Id) =
-    sql"""DELETE FROM companies WHERE id=$id"""
-      .update
+    sql"""DELETE FROM companies WHERE id=$id""".update
 
   def listAllQ(pageSize: Int, offset: Int) =
     paginate(pageSize, offset)(
@@ -51,15 +52,16 @@ private[sql] object CompanySQL {
 }
 
 class DoobieCompanyRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
-  extends Company.Repo[F] {
+    extends Company.Repo[F] {
   import CompanySQL._
   import com.lion.rafiki.domain.RepoError._
 
-  override def create(company: Company.CreateRecord): Result[Company.Record] = insertQ(company.name, company.rh_user)
-    .withUniqueGeneratedKeys[Company.Id]("id")
-    .map(company.withId _)
-    .toResult()
-    .transact(xa)
+  override def create(company: Company.CreateRecord): Result[Company.Record] =
+    insertQ(company.name, company.rh_user)
+      .withUniqueGeneratedKeys[Company.Id]("id")
+      .map(company.withId _)
+      .toResult()
+      .transact(xa)
 
   override def update(company: Company.Record): Result[Company.Record] = {
     updateQ(company.id, company.data.name).run
@@ -68,7 +70,8 @@ class DoobieCompanyRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
       .transact(xa)
   }
 
-  override def get(id: Company.Id): Result[Company.Record] = byIdQ(id).option.toResult().transact(xa)
+  override def get(id: Company.Id): Result[Company.Record] =
+    byIdQ(id).option.toResult().transact(xa)
 
   override def delete(id: Company.Id): Result[Unit] = byIdQ(id).unique
     .flatMap(_ => deleteQ(id).run.as(()))
@@ -78,12 +81,17 @@ class DoobieCompanyRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
   override def list(pageSize: Int, offset: Int): Result[List[Company.Record]] =
     listAllQ(pageSize: Int, offset: Int).to[List].toResult().transact(xa)
 
-  override def listWithUser(pageSize: Int, offset: Int): Result[List[Company.Full]] =
+  override def listWithUser(
+      pageSize: Int,
+      offset: Int
+  ): Result[List[Company.Full]] =
     listAllWithUsersQ(pageSize: Int, offset: Int)
       .to[List]
       .toResult()
       .transact(xa)
 
-  override def getByUser(id: User.Id): Result[Company.Record] = byUserIdQ(id).option.toResult().transact(xa)
-  override def getByUserEmail(email: String): Result[Company.Record] = byUserEmailQ(email).option.toResult().transact(xa)
+  override def getByUser(id: User.Id): Result[Company.Record] =
+    byUserIdQ(id).option.toResult().transact(xa)
+  override def getByUserEmail(email: String): Result[Company.Record] =
+    byUserEmailQ(email).option.toResult().transact(xa)
 }

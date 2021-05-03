@@ -8,15 +8,16 @@ final case class WithId[Id, +A](id: Id, data: A) {
 }
 
 object WithId {
-  def encoder[Id: Encoder, A: Encoder]: Encoder[WithId[Id, A]] = Encoder.instance {
-    wId => wId.data.asJson.asObject.get.add("id", wId.id.asJson).asJson
-  }
+  def encoder[Id: Encoder, A: Encoder]: Encoder[WithId[Id, A]] =
+    Encoder.instance { wId =>
+      wId.data.asJson.asObject.get.add("id", wId.id.asJson).asJson
+    }
 
-  def decoder[Id: Decoder, A: Decoder]: Decoder[WithId[Id, A]] = Decoder.instance {
-    wId =>
+  def decoder[Id: Decoder, A: Decoder]: Decoder[WithId[Id, A]] =
+    Decoder.instance { wId =>
       for {
         id <- wId.downField("id").as[Id]
         data <- wId.value.as[A]
       } yield new WithId(id, data)
-  }
+    }
 }

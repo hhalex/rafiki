@@ -6,7 +6,7 @@ import org.http4s.implicits._
 import org.http4s.dsl.io._
 
 package object endpoints {
-  class IdVar[Id] (tag: Long => Id) {
+  class IdVar[Id](tag: Long => Id) {
     def unapply(str: String): Option[Id] = str.toLongOption.map(tag)
   }
 }

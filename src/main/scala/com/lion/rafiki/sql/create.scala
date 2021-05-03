@@ -149,5 +149,13 @@ object create {
        UNIQUE(form_session_id, user_id)
     )""".update
 
-  val allTables = (users.run, companies.run, companyContracts.run, formTrees.run, forms.run, formSessions.run, formSessionInvites.run).mapN(_ + _ + _ + _ + _ + _ + _).as(())
+  val allTables = (
+    users.run,
+    companies.run,
+    companyContracts.run,
+    formTrees.run,
+    forms.run,
+    formSessions.run,
+    formSessionInvites.run
+  ).mapN(_ + _ + _ + _ + _ + _ + _).as(())
 }

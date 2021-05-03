@@ -44,7 +44,9 @@ object FormSQLSpec extends Specification with IOChecker {
   check(insertTreeQuestionQ(treeId, "label", "text"))
   check(insertTreeGroupQ(treeId))
   check(insertTreeTextQ(treeId, "text"))
-  check(updateQ(formId, companyId.some, "name", "description".some, treeKey.some))
+  check(
+    updateQ(formId, companyId.some, "name", "description".some, treeKey.some)
+  )
   check(deleteTreeQ(treeKey))
   check(deleteTreeChildQ(treeKey, treeKey :: Nil))
   check(updateTreeHeaderQ(treeKey, treeKey.some))

@@ -2,11 +2,30 @@ package com.lion.rafiki
 
 import cats.effect.{ExitCode, IO, IOApp}
 import cats.syntax.semigroupk._
-import com.lion.rafiki.auth.{CryptoBits, HotUserStore, PasswordHasher, PrivateKey, UserAuth}
+import com.lion.rafiki.auth.{
+  CryptoBits,
+  HotUserStore,
+  PasswordHasher,
+  PrivateKey,
+  UserAuth
+}
 import com.lion.rafiki.domain.company.{Form, FormSession, FormSessionInvite}
 import com.lion.rafiki.domain.{Company, CompanyContract, User}
-import com.lion.rafiki.endpoints.{AuthenticationEndpoints, CompanyBusinessEndpoints, CompanyEndpoints, UserEndpoints}
-import com.lion.rafiki.sql.{DoobieCompanyContractRepo, DoobieCompanyRepo, DoobieFormRepo, DoobieFormSessionInviteRepo, DoobieFormSessionRepo, DoobieUserRepo, create}
+import com.lion.rafiki.endpoints.{
+  AuthenticationEndpoints,
+  CompanyBusinessEndpoints,
+  CompanyEndpoints,
+  UserEndpoints
+}
+import com.lion.rafiki.sql.{
+  DoobieCompanyContractRepo,
+  DoobieCompanyRepo,
+  DoobieFormRepo,
+  DoobieFormSessionInviteRepo,
+  DoobieFormSessionRepo,
+  DoobieUserRepo,
+  create
+}
 import doobie.util.transactor.Transactor
 import doobie.implicits._
 import fs2._
@@ -41,38 +60,72 @@ object Main extends IOApp {
 
         val companyService = new Company.Service[IO](companyRepo, userService)
         val companyContractRepo = new DoobieCompanyContractRepo[IO](xa)
-        val companyContractValidation = new CompanyContract.FromRepoValidation[IO](companyContractRepo)
-        val companyContractService = new CompanyContract.Service[IO](companyContractRepo)
+        val companyContractValidation =
+          new CompanyContract.FromRepoValidation[IO](companyContractRepo)
+        val companyContractService =
+          new CompanyContract.Service[IO](companyContractRepo)
 
         val formRepo = new DoobieFormRepo[IO](xa)
         val formValidation = new Form.FromRepoValidation[IO](formRepo)
         val formService = new Form.Service[IO](formRepo, formValidation)
 
         val formSessionRepo = new DoobieFormSessionRepo[IO](xa)
-        val formSessionValidation = new FormSession.FromRepoValidation[IO](formSessionRepo, formValidation, companyContractRepo)
+        val formSessionValidation = new FormSession.FromRepoValidation[IO](
+          formSessionRepo,
+          formValidation,
+          companyContractRepo
+        )
 
-        val formSessionService = new FormSession.Service[IO](formSessionRepo, formSessionValidation)
+        val formSessionService =
+          new FormSession.Service[IO](formSessionRepo, formSessionValidation)
         val formSessionInviteRepo = new DoobieFormSessionInviteRepo[IO](xa)
-        val formSessionInviteValidation = new FormSessionInvite.FromRepoValidation[IO](formSessionInviteRepo, formSessionValidation)
-        val formSessionInviteService = new FormSessionInvite.Service[IO](formSessionInviteRepo, formSessionInviteValidation, formSessionValidation, userService)
+        val formSessionInviteValidation =
+          new FormSessionInvite.FromRepoValidation[IO](
+            formSessionInviteRepo,
+            formSessionValidation
+          )
+        val formSessionInviteService = new FormSessionInvite.Service[IO](
+          formSessionInviteRepo,
+          formSessionInviteValidation,
+          formSessionValidation,
+          userService
+        )
 
-        val privateKey = PrivateKey(scala.io.Codec.toUTF8(scala.util.Random.alphanumeric.take(20).mkString("")))
+        val privateKey = PrivateKey(
+          scala.io.Codec.toUTF8(
+            scala.util.Random.alphanumeric.take(20).mkString("")
+          )
+        )
         val crypto = CryptoBits(privateKey)
         val clock = Clock.systemUTC()
 
-        val hotUserStore = new HotUserStore[IO](conf.hotUsersList, passwordHasher)
-        val userAuth = new UserAuth[IO](userService, companyRepo, hotUserStore, crypto)
+        val hotUserStore =
+          new HotUserStore[IO](conf.hotUsersList, passwordHasher)
+        val userAuth =
+          new UserAuth[IO](userService, companyRepo, hotUserStore, crypto)
 
-        val authEndpoints = new AuthenticationEndpoints[IO]().endpoints(userAuth, clock)
-        val companyEndpoints = new CompanyEndpoints[IO]().endpoints(companyService, companyContractService, userAuth)
-        val userEndpoints = new UserEndpoints[IO]().endpoints(userService, userAuth)
-        val companyBusinessEndpoints = new CompanyBusinessEndpoints[IO]().endpoints(formService, formSessionService, formSessionInviteService, userAuth)
+        val authEndpoints =
+          new AuthenticationEndpoints[IO]().endpoints(userAuth, clock)
+        val companyEndpoints = new CompanyEndpoints[IO]().endpoints(
+          companyService,
+          companyContractService,
+          userAuth
+        )
+        val userEndpoints =
+          new UserEndpoints[IO]().endpoints(userService, userAuth)
+        val companyBusinessEndpoints =
+          new CompanyBusinessEndpoints[IO]().endpoints(
+            formService,
+            formSessionService,
+            formSessionInviteService,
+            userAuth
+          )
 
         val httpApp = Router(
           "/" -> (authEndpoints <+> Routes.uiRoutes),
           "/api" -> Router(
             "/company" -> companyBusinessEndpoints,
-            "/admin" -> (companyEndpoints <+> userEndpoints),
+            "/admin" -> (companyEndpoints <+> userEndpoints)
           )
         ).orNotFound
 

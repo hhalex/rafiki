@@ -20,7 +20,7 @@ object UserSQLSpec extends Specification with IOChecker {
       "org.postgresql.Driver",
       conf.dbUrl,
       conf.dbUser,
-      conf.dbPassword,
+      conf.dbPassword
     )
     create.allTables.transact(xa).unsafeRunSync()
     xa
