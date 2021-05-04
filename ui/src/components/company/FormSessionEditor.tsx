@@ -7,7 +7,6 @@ import { ArrowRightAltOutlined, Clear } from '@material-ui/icons';
 import AddIcon from '@material-ui/icons/Add';
 import { Link, Route, Switch, useHistory, useParams, useRouteMatch } from "react-router-dom";
 import { Form } from "../../api/company/form";
-import { CompanyContract } from "../../api/companyContract";
 import { FormSessionInvite } from "../../api/company/invite";
 
 const useStylesCRUD = makeStyles({
@@ -113,9 +112,10 @@ const FormEdit = ({ apiSession, apiInvite, apiForm, back }: APIProps & { back: (
       ? <ValidatedForm
         forms={forms}
         initialValues={data as EditorData}
-        submit={(data: FormSession.Update, invites: InvitesList) => {
-          const invitePromises = invites.map(inv => inv.id ? apiInvite.update(inv as FormSessionInvite.Update) : apiInvite.create(inv, data.id));
-          return Promise.all([apiSession.update(data), invitePromises]).catch(() => {});
+        submit={(data: FormSession.Update, invites: InvitesList, deletedInvites: InvitesList) => {
+          const deletedPromises = Promise.all(deletedInvites.map(inv => apiInvite.delete(inv.id!)));
+          const invitePromises = Promise.all(invites.map(inv => inv.id ? apiInvite.update(inv as FormSessionInvite.Update) : apiInvite.create(inv, data.id)));
+          return Promise.all([apiSession.update(data), invitePromises, deletedPromises]).catch(() => {});
         }}
         back={back}
       />
@@ -125,7 +125,7 @@ const FormEdit = ({ apiSession, apiInvite, apiForm, back }: APIProps & { back: (
   return <ValidatedForm
     forms={forms}
     initialValues={{ invites: [] }}
-    submit={(data: FormSession.Create, invites: InvitesList) =>
+    submit={(data: FormSession.Create, invites: InvitesList) =>
       apiSession.create(data, data.formId)
         .then(formSession => Promise.all(invites.map(inv => apiInvite.create(inv, formSession.id))))
         .catch(() => { })
@@ -254,7 +254,7 @@ const validationSchema = Yup.object({
     })
 });
 
-type SubmitF = ((_1: FormSession.Create, _2: InvitesList) => Promise<any>) | ((_1: FormSession.Update, _2: InvitesList) => Promise<any>);
+type SubmitF = ((_1: FormSession.Create, _2: InvitesList, deleted: InvitesList) => Promise<any>) | ((_1: FormSession.Update, _2: InvitesList, deleted: InvitesList) => Promise<any>);
 
 const ValidatedForm = ({ initialValues, back, forms, submit }: { initialValues: EditorData, forms: Form.Full[], back: () => void, submit: SubmitF }) => {
   const classes = useStylesVF();
@@ -270,7 +270,8 @@ const ValidatedForm = ({ initialValues, back, forms, submit }: { initialValues: 
     validationSchema={validationSchema}
     validateOnChange={false}
     onSubmit={(values) => {
-      submit({...values, invites: undefined} as any, values.invites as {user: string, team: string}[])
+      const deletedInvites = initialValues.invites.filter(i => !values.invites.find(newInvites => newInvites.user === i.user))
+      submit({...values, invites: undefined} as any, values.invites as {user: string, team: string}[], deletedInvites as {user: string, team: string}[])
       console.log(values);
       back();
     }}
