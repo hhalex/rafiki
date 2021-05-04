@@ -9,7 +9,6 @@ export type Form<Tree> = {
 
 
 export namespace Form {
-    
     export type Tree = Tree.Question | Tree.Group | Tree.Text;
     export namespace Tree {
         export namespace Question {

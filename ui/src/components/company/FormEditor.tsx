@@ -16,7 +16,7 @@ type EditorData = {
   name?: string,
   description?: string,
   answers?: Form.Tree.Question.Answer[],
-  tree?: Form.Tree.QuestionGroup,
+  tree?: Form.Tree.QuestionGroup & { id?: string },
 };
 
 type APIProps = { api: ReturnType<typeof Form.createApi> }
@@ -72,9 +72,9 @@ const FormOverview = ({ api }: APIProps) => {
     <ListItem key="new">
       <Button
         onClick={() => {}}
-        variant="outlined" 
-        size="medium" 
-        color="primary" 
+        variant="outlined"
+        size="medium"
+        color="primary"
         aria-label="add"
         startIcon={<AddIcon />}
         component={Link}
@@ -102,7 +102,7 @@ const FormEdit = ({ api, back }: APIProps & { back: () => void }) => {
 
 const useStylesVF = makeStyles({
   table: {},
-  formEntry: { 
+  formEntry: {
     justifyContent: "space-between",
     "& .formEntryEdit": {
       cursor: "pointer",
@@ -152,11 +152,10 @@ const useStylesVF = makeStyles({
   questionItem: {
     display: "flex"
   },
-  
+
   answersList: {
     marginLeft: "2em",
     borderLeft: "1px solid rgba(0, 0, 0, 0.12);",
-    
   },
   answerListItem: {
     "& .avalue": {
@@ -228,7 +227,7 @@ const ValidatedForm = ({ initialValues, back, submit }: { initialValues: EditorD
     validationSchema={validationSchema}
     validateOnChange={false}
     onSubmit={(values) => {
-      submit({...values, questions: undefined, tree: {children: values.questions}} as any)
+      submit({...values, questions: undefined, tree: {id: initialValues.tree?.id, children: values.questions}} as any)
         .then(back);
     }}
   >{({ values, touched, errors, handleChange }) => (
@@ -297,7 +296,7 @@ const ValidatedForm = ({ initialValues, back, submit }: { initialValues: EditorD
                       helperText={touchedText && errorText}
                     />
                   </div>
-                
+
                 <FieldArray name={answers}>
                   {answerHelper => (<List className={classes.answersList}>{
                     question.answers.map((answer: Form.Tree.Question.Answer, answerIndex: number) => {
@@ -356,10 +355,10 @@ const ValidatedForm = ({ initialValues, back, submit }: { initialValues: EditorD
             })
           }
             <ListItem className={classes.addQuestion}>
-              <Button 
-                variant="outlined" 
-                size="medium" 
-                color="primary" 
+              <Button
+                variant="outlined"
+                size="medium"
+                color="primary"
                 aria-label="add"
                 startIcon={<AddIcon />}
                 onClick={() => questionHelper.push({label: `q-${values.questions.length.toLocaleString("fr-FR", { minimumIntegerDigits: 3 })}`, text: "", answers: []})}
