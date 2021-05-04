@@ -67,10 +67,10 @@ class UserAuth[F[_]: Sync](userService: User.Service[F], companyRepo: Company.Re
       companyRepo.getByUserEmail(authed.email).leftMap[AuthError](AuthError.CompanyAuthError)
     }
 
-  val authCompany = AuthMiddleware.withFallThrough[F, Company.Record](
+  val authCompany = AuthMiddleware[F, Company.Record](
     Kleisli { (r: Request[F]) => (auth andThen resolveCompany).run(r).toOption }
   )
-  val authAdmin = AuthMiddleware.withFallThrough[F, User.Authed](
+  val authAdmin = AuthMiddleware[F, User.Authed](
     Kleisli { (r: Request[F]) => (auth andThen resolveAdmin).run(r).toOption }
   )
 }
