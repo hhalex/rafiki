@@ -14,7 +14,9 @@ final case class CompanyContract[Company](
   def withId(id: CompanyContract.Id) = WithId(id, this)
 }
 
-object CompanyContract extends TaggedId {
+trait ContractId
+object CompanyContract extends TaggedId[ContractId] {
+  import Company.{taggedIdDecoder, taggedIdEncoder}
   sealed trait Kind extends Product with Serializable {
     override def toString: String = this match {
       case Kind.Unlimited  => "unlimited"

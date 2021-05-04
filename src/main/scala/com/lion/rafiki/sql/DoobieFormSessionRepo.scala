@@ -18,8 +18,7 @@ private[sql] object FormSessionSQL {
   import CompanyContractSQL._
   import CompanySQL._
   import FormSQL._
-  implicit val formSessionIdReader: Meta[FormSession.Id] =
-    Meta[Long].imap(FormSession.tag)(FormSession.unTag)
+  implicit val formSessionIdReader: Meta[FormSession.Id] = createMetaId(FormSession)
   implicit val han: LogHandler = LogHandler.jdkLogHandler
 
   def byIdQ(id: FormSession.Id) =

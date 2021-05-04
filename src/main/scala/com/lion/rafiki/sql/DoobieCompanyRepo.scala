@@ -13,11 +13,12 @@ import doobie.syntax.SqlInterpolator.SingleFragment.fromPut
 
 private[sql] object CompanySQL {
   import UserSQL._
+  val test = (1, "sting")
   implicit val companyIdReader: Meta[Company.Id] = createMetaId(Company)
   implicit val companyWithUserReader: Read[Company.Full] =
-    Read[(Company.Record, User.Record)].map((one, two) =>
-      one.mapData(_.copy(rh_user = two.data))
-    )
+    Read[(Company.Record, User.Record)].map({
+      case (company, user) => company.mapData(_.copy(rh_user = user.data))
+    })
 
   def byIdQ(id: Company.Id) =
     sql"""SELECT * FROM companies WHERE id=$id""".query[Company.Record]

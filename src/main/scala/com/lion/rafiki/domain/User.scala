@@ -17,7 +17,8 @@ final case class User[Password](
   def withId(id: User.Id) = WithId(id, this)
 }
 
-object User extends TaggedId {
+trait UserId
+object User extends TaggedId[UserId] {
 
   implicit def userPassStrEncoder[T]: Encoder[User[T]] = Encoder.instance {
     u => Json.obj("username" -> u.username.asJson)

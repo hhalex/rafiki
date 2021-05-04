@@ -26,13 +26,16 @@ case class FormSession(
   def withId(id: FormSession.Id) = WithId(id, this)
 }
 
-object FormSession extends TaggedId {
+private trait SessionId
+object FormSession extends TaggedId[SessionId] {
 
   type Create = FormSession
   type Update = WithId[Id, Create]
   type Record = Update
   type Full = Update
 
+
+  import Form.{taggedIdDecoder, taggedIdEncoder}
   implicit val formSessionCreateDecoder: Decoder[Create] = deriveDecoder
   implicit val formSessionCreateEncoder: Encoder[Create] = deriveEncoder
   implicit val formSessionUpdateDecoder: Decoder[Update] = WithId.decoder

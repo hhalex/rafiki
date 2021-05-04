@@ -11,7 +11,7 @@ import com.lion.rafiki.domain.{
   WithId
 }
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
-import io.circe.syntax.EncoderOps
+import io.circe.syntax._
 import io.circe.{Decoder, Encoder}
 
 case class Form[T](
@@ -22,35 +22,39 @@ case class Form[T](
 ) {
   def withId(id: Form.Id) = WithId(id, this)
 }
-
-object Form extends TaggedId {
-  sealed trait Tree {
-    val kind = this match {
-      case _: Tree.Text | _: Tree.TextWithKey         => Tree.Kind.Text
-      case _: Tree.Question | _: Tree.QuestionWithKey => Tree.Kind.Question
-      case _: Tree.Group | _: Tree.GroupWithKey       => Tree.Kind.Group
+trait FormId
+object Form extends TaggedId[FormId] {
+  extension [T <: TreeP](tree: T) {
+    def withId(id: Tree.Id) = WithId(id, tree)
+    def kind: Tree.Kind = tree match {
+      case _: Tree.Text        => Tree.Kind.Text
+      case _: Tree.Question  => Tree.Kind.Question
+      case _: Tree.Group       => Tree.Kind.Group
     }
 
-    def getLabels(): Set[String] = {
-      def rec(t: Form.Tree): List[String] = t match {
-        case Form.Tree.Question(label, _, _)              => List(label)
-        case Form.Tree.QuestionWithKey(_, label, _, _)    => List(label)
-        case _: Form.Tree.Text | _: Form.Tree.TextWithKey => Nil
-        case Form.Tree.Group(children)                    => children.flatMap(rec)
-        case Form.Tree.GroupWithKey(_, children)          => children.flatMap(rec)
+    def labels: Set[String] = {
+      def rec(t: Form.TreeP): List[String] = t match {
+        case Form.Tree.Question(label, _, _)    => List(label)
+        case _: Form.Tree.Text                  => Nil
+        case Form.Tree.Group(children)          => children.flatMap({
+          case WithId(id, treeP) => rec(treeP)
+          case treeP: TreeP => rec(treeP)
+        })
       }
-      rec(this).toSet
+      rec(tree).toSet
     }
-    def withKey(id: Tree.Id): TreeWithKey
-  }
-  sealed trait TreeWithKey extends Tree {
-    val id: Tree.Id
-    val key = (id, kind)
   }
 
-  object Tree extends TaggedId {
-    import io.circe.generic.auto._
+  extension [T <: TreeP](treeWithId: WithId[Tree.Id, T]) {
+    def key = (treeWithId.id, treeWithId.data.kind)
+    def kind: Tree.Kind = treeWithId.data.kind
+    def labels: Set[String] = treeWithId.data.labels
+  }
 
+  type TreeP = Tree.Text | Tree.Question | Tree.Group
+  type Tree = TreeP | WithId[Tree.Id, TreeP]
+  trait TreeId
+  object Tree extends TaggedId[TreeId] {
     sealed trait Kind
     object Kind {
       case object Question extends Kind
@@ -79,36 +83,13 @@ object Form extends TaggedId {
 
     type Key = (Id, Kind)
 
-    case class Text(text: String) extends Tree {
-      override def withKey(id: Id) = TextWithKey(id, text)
-    }
-    case class TextWithKey(id: Id, text: String) extends Tree with TreeWithKey {
-      override def withKey(id: Id) = copy(id = id)
-    }
+    case class Text(text: String)
     case class Question(
         label: String,
         text: String,
         answers: List[Question.Answer]
-    ) extends Tree {
-      override def withKey(id: Id) = QuestionWithKey(id, label, text, answers)
-    }
-    case class QuestionWithKey(
-        id: Tree.Id,
-        label: String,
-        text: String,
-        answers: List[Question.Answer]
-    ) extends Tree
-        with TreeWithKey {
-      override def withKey(id: Id) = copy(id = id)
-    }
-    case class Group(children: List[Tree]) extends Tree {
-      override def withKey(id: Id) = GroupWithKey(id, children)
-    }
-    case class GroupWithKey(id: Id, children: List[Tree])
-        extends Tree
-        with TreeWithKey {
-      override def withKey(id: Id) = copy(id = id)
-    }
+    )
+    case class Group(children: List[Tree])
 
     object Question {
 
@@ -118,8 +99,9 @@ object Form extends TaggedId {
       sealed trait AnswerWithId extends Answer {
         val id: Answer.Id
       }
-      object Answer extends TaggedId {
-
+      trait AnswerId
+      object Answer extends TaggedId[AnswerId] {
+        import io.circe.generic.auto._
         case class FreeText(label: Option[String]) extends Answer {
           override def withId(id: Id) = FreeTextWithId(id, label)
         }
@@ -163,40 +145,48 @@ object Form extends TaggedId {
         }
       }
     }
+    // Decoding
+    implicit val treeGroupDecoder: Decoder[Group] = deriveDecoder
+    implicit val treeTextDecoder: Decoder[Text] = deriveDecoder
+    implicit val treeQuestionDecoder: Decoder[Question] = deriveDecoder
 
-    implicit val formTreeWithKeyEncoder: Encoder[TreeWithKey] =
-      Encoder.instance {
-        case r: TextWithKey     => r.asJson
-        case r: QuestionWithKey => r.asJson
-        case r: GroupWithKey    => r.asJson
-      }
+    implicit val formTreePDecoder: Decoder[TreeP] =
+      Decoder[Question].widen[TreeP]
+        .or(Decoder[Text].widen)
+        .or(Decoder[Group].widen)
 
-    implicit val formTreeWithKeyDecoder: Decoder[TreeWithKey] =
-      List[Decoder[TreeWithKey]](
-        Decoder[QuestionWithKey].widen,
-        Decoder[TextWithKey].widen,
-        Decoder[GroupWithKey].widen
-      ).reduceLeft(_ or _)
+    implicit val formTreeIdDecoder: Decoder[WithId[Tree.Id, TreeP]] = WithId.decoder
 
-    implicit val formTreeDecoder: Decoder[Tree] = List[Decoder[Tree]](
-      Decoder[TreeWithKey].widen,
-      Decoder[Question].widen,
-      Decoder[Text].widen,
-      Decoder[Group].widen
-    ).reduceLeft(_ or _)
+    implicit val formTreeDecoder: Decoder[Tree] =
+      Decoder[WithId[Tree.Id, TreeP]].widen
+        .or(Decoder[TreeP].widen)
 
-    implicit val formTreeEncoder: Encoder[Tree] = Encoder.instance {
-      case r: TreeWithKey => r.asJson
+    // Encoding
+    implicit val treeGroupEncoder: Encoder[Group] = deriveEncoder
+    implicit val treeTextEncoder: Encoder[Text] = deriveEncoder
+    implicit val treeQuestionEncoder: Encoder[Question] = deriveEncoder
+
+    implicit val formTreePEncoder: Encoder[TreeP] = Encoder.instance {
       case r: Text        => r.asJson
       case r: Question    => r.asJson
       case r: Group       => r.asJson
     }
 
-    type Create = Tree
-    type Update = TreeWithKey
-    type Record = TreeWithKey
+    implicit val formTreeIdEncoder: Encoder[WithId[Tree.Id, TreeP]] = WithId.encoder
+
+    implicit val formTreeEncoder: Encoder[Tree] = Encoder.instance {
+      case r: WithId[Tree.Id, TreeP]        => r.asJson
+      case r: TreeP    => r.asJson
+    }
+
+    type Create = TreeP
+    type Update = WithId[Id, TreeP]
+    type Record = Update
   }
 
+  import Tree.{taggedIdDecoder, taggedIdEncoder}
+  import Company.{taggedIdDecoder, taggedIdEncoder}
+  implicit val formKeyEncoder: Encoder[Tree.Key] = deriveEncoder
   implicit def formDecoder[T: Decoder]: Decoder[Form[T]] = deriveDecoder
   implicit def formEncoder[T: Encoder]: Encoder[Form[T]] = deriveEncoder
   implicit val formCreateDecoder: Decoder[Create] = deriveDecoder
@@ -207,7 +197,7 @@ object Form extends TaggedId {
   type Create = Form[Tree]
   type Update = WithId[Id, Create]
   type Record = WithId[Id, Form[Tree.Key]]
-  type Full = WithId[Id, Form[TreeWithKey]]
+  type Full = WithId[Id, Form[Tree.Record]]
 
   trait Repo[F[_]] {
     type Result[T] = EitherT[F, RepoError, T]
@@ -257,10 +247,10 @@ object Form extends TaggedId {
     def create(form: Create, companyId: Option[Company.Id]): Result[Full] =
       (for {
         createdForm <- repo.create(form.copy(company = companyId))
-        answerTableName = s"form${createdForm.id.value}_answers"
+        answerTableName = s"form${createdForm.id}_answers"
           .asInstanceOf[InviteAnswer.TableName]
         _ <- createdForm.data.tree.traverse(t =>
-          inviteAnswerRepo.overrideAnswerTable(answerTableName, t.getLabels())
+          inviteAnswerRepo.overrideAnswerTable(answerTableName, t.labels)
         )
       } yield createdForm).leftMap(ValidationError.Repo)
 
@@ -282,11 +272,11 @@ object Form extends TaggedId {
         result <- repo
           .update(form.mapData(_.copy(company = formDB.data.company)))
           .leftMap[ValidationError](ValidationError.Repo)
-        answerTableName = s"form${result.id.value}_answers"
+        answerTableName = s"form${result.id}_answers"
           .asInstanceOf[InviteAnswer.TableName]
         _ <- result.data.tree
           .traverse(t =>
-            inviteAnswerRepo.overrideAnswerTable(answerTableName, t.getLabels())
+            inviteAnswerRepo.overrideAnswerTable(answerTableName, t.labels)
           )
           .leftMap(ValidationError.Repo)
       } yield result

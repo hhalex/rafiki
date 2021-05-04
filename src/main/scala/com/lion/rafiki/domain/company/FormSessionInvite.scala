@@ -9,9 +9,9 @@ import io.circe.{Decoder, Encoder}
 case class FormSessionInvite[User](user: User, team: String, acceptConditions: Option[Boolean]) {
   def withId(id: FormSessionInvite.Id) = WithId(id, this)
 }
-
-object FormSessionInvite extends TaggedId {
-
+trait InviteId
+object FormSessionInvite extends TaggedId[InviteId] {
+  import User.{taggedIdDecoder, taggedIdEncoder}
   type Create = FormSessionInvite[User.Create]
   type CreateRecord = FormSessionInvite[User.Id]
   type Update = WithId[Id, Create]

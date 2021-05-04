@@ -21,6 +21,8 @@ lazy val root = (project in file("."))
       "org.http4s"          %% "http4s-dsl"          % Http4sVersion,
       ("com.github.t3hnar"   %% "scala-bcrypt"        % "4.3.0").cross(CrossVersion.for3Use2_13),
       "io.circe"            %% "circe-generic"       % CirceVersion,
+      "io.circe"            %% "circe-core"       % CirceVersion,
+      "io.circe"            %% "circe-parser"       % CirceVersion,
       "org.tpolecat"        %% "doobie-core"         % DoobieVersion,
       "org.tpolecat"        %% "doobie-postgres"     % DoobieVersion,
       ("org.tpolecat"        %% "doobie-specs2"       % DoobieVersion % "test").cross(CrossVersion.for3Use2_13) excludeAll(
@@ -41,6 +43,8 @@ scalacOptions ++= Seq(
   "-encoding", "UTF-8",
   "-feature",
   "-Ykind-projector",
+  "-language:postfixOps",
+  "-Ysafe-init",
   "-unchecked",
   "-source:3.0-migration"
 )

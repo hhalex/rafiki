@@ -7,13 +7,14 @@ import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 
 type Label = String
-case class AnswerValue(numeric: Option[Int], freetext: Option[String]) 
+case class AnswerValue(numeric: Option[Int], freetext: Option[String])
 
 case class InviteAnswer(values: Map[Label, AnswerValue]) {
   def withId(id: FormSessionInvite.Id) = WithId(id, this)
 }
 
 object InviteAnswer {
+  import FormSessionInvite.{taggedIdDecoder, taggedIdEncoder}
   opaque type TableName <: String = String
 
   type Create = InviteAnswer
@@ -31,6 +32,6 @@ object InviteAnswer {
   trait Repo[F[_]] {
     type Result[T] = EitherT[F, RepoError, T]
     def overrideAnswerTable(id: TableName, labels: Set[String]): Result[Unit]
-    
+
   }
 }
