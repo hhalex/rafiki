@@ -1,11 +1,13 @@
 package com.lion.rafiki.sql
 
 import doobie.implicits._
+import doobie._
 import cats.implicits._
+import cats.syntax.all._
 import cats.effect.MonadCancel
 import cats.implicits.toFunctorOps
 import com.lion.rafiki.domain.company.Form
-import com.lion.rafiki.domain.{Company, RepoError}
+import com.lion.rafiki.domain.{Company, RepoError, WithId}
 import com.lion.rafiki.sql.SQLPagination.paginate
 import doobie.{LogHandler, Transactor}
 import doobie.free.connection.ConnectionIO
@@ -15,6 +17,7 @@ import doobie.util.Read
 import doobie.util.fragments.whereAnd
 import doobie.util.meta.Meta
 import doobie.util.query.Query0
+import doobie.util.update.Update0
 
 private[sql] object FormSQL {
   import CompanySQL._

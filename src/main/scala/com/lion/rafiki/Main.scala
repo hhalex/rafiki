@@ -22,6 +22,7 @@ import com.lion.rafiki.sql.{
   DoobieCompanyRepo,
   DoobieFormRepo,
   DoobieFormSessionInviteRepo,
+  DoobieInviteAnswerRepo,
   DoobieFormSessionRepo,
   DoobieUserRepo,
   create
@@ -65,9 +66,11 @@ object Main extends IOApp {
         val companyContractService =
           new CompanyContract.Service[IO](companyContractRepo)
 
+        val inviteAnswerRepo = new DoobieInviteAnswerRepo[IO](xa)
+
         val formRepo = new DoobieFormRepo[IO](xa)
         val formValidation = new Form.FromRepoValidation[IO](formRepo)
-        val formService = new Form.Service[IO](formRepo, formValidation)
+        val formService = new Form.Service[IO](formRepo, inviteAnswerRepo, formValidation)
 
         val formSessionRepo = new DoobieFormSessionRepo[IO](xa)
         val formSessionValidation = new FormSession.FromRepoValidation[IO](

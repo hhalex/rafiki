@@ -30,6 +30,17 @@ object Form extends TaggedId {
       case _: Tree.Question | _: Tree.QuestionWithKey => Tree.Kind.Question
       case _: Tree.Group | _: Tree.GroupWithKey       => Tree.Kind.Group
     }
+
+    def getLabels(): Set[String] = {
+      def rec(t: Form.Tree): List[String] = t match {
+        case Form.Tree.Question(label, _, _)              => List(label)
+        case Form.Tree.QuestionWithKey(_, label, _, _)    => List(label)
+        case _: Form.Tree.Text | _: Form.Tree.TextWithKey => Nil
+        case Form.Tree.Group(children)                    => children.flatMap(rec)
+        case Form.Tree.GroupWithKey(_, children)          => children.flatMap(rec)
+      }
+      rec(this).toSet
+    }
     def withKey(id: Tree.Id): TreeWithKey
   }
   sealed trait TreeWithKey extends Tree {
@@ -237,11 +248,21 @@ object Form extends TaggedId {
     } yield repoForm
   }
 
-  class Service[F[_]: Monad](repo: Repo[F], validation: Validation[F]) {
+  class Service[F[_]: Monad](
+      repo: Repo[F],
+      inviteAnswerRepo: InviteAnswer.Repo[F],
+      validation: Validation[F]
+  ) {
     type Result[T] = EitherT[F, ValidationError, T]
-    def create(form: Create, companyId: Option[Company.Id]): Result[Full] = {
-      repo.create(form.copy(company = companyId)).leftMap(ValidationError.Repo)
-    }
+    def create(form: Create, companyId: Option[Company.Id]): Result[Full] =
+      (for {
+        createdForm <- repo.create(form.copy(company = companyId))
+        answerTableName = s"form${createdForm.id.value}_answers"
+          .asInstanceOf[InviteAnswer.TableName]
+        _ <- createdForm.data.tree.traverse(t =>
+          inviteAnswerRepo.overrideAnswerTable(answerTableName, t.getLabels())
+        )
+      } yield createdForm).leftMap(ValidationError.Repo)
 
     def getById(formId: Id, companyId: Option[Company.Id]): Result[Full] = for {
       _ <- validation.hasOwnership(formId, companyId)
@@ -261,6 +282,13 @@ object Form extends TaggedId {
         result <- repo
           .update(form.mapData(_.copy(company = formDB.data.company)))
           .leftMap[ValidationError](ValidationError.Repo)
+        answerTableName = s"form${result.id.value}_answers"
+          .asInstanceOf[InviteAnswer.TableName]
+        _ <- result.data.tree
+          .traverse(t =>
+            inviteAnswerRepo.overrideAnswerTable(answerTableName, t.getLabels())
+          )
+          .leftMap(ValidationError.Repo)
       } yield result
 
     def listByCompany(
