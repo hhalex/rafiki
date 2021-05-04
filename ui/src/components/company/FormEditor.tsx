@@ -350,7 +350,6 @@ const ValidatedForm = ({ initialValues, back, submit }: { initialValues: EditorD
                 <IconButton onClick={() => questionHelper.remove(questionIndex)}>
                   <Clear />
                 </IconButton>
-                
               </ListItem>
             })
           }
@@ -361,7 +360,7 @@ const ValidatedForm = ({ initialValues, back, submit }: { initialValues: EditorD
                 color="primary"
                 aria-label="add"
                 startIcon={<AddIcon />}
-                onClick={() => questionHelper.push({label: `q-${values.questions.length.toLocaleString("fr-FR", { minimumIntegerDigits: 3 })}`, text: "", answers: []})}
+                onClick={() => questionHelper.push({label: `q_${values.questions.length.toLocaleString("fr-FR", { minimumIntegerDigits: 3 })}`, text: "", answers: []})}
               >Question</Button>
             </ListItem>
           </List>
