@@ -134,20 +134,20 @@ object create {
           )
     )""".update
 
-  val formSessionInvites =
-    sql"""
-    CREATE TABLE IF NOT EXISTS form_session_invites (
-       id                     bigserial         PRIMARY KEY,
-       form_session_id        bigint            NOT NULL,
-       user_id                bigint            NOT NULL,
-       team                   text              NOT NULL DEFAULT '/',
-       accept_conditions      boolean,
-       FOREIGN KEY (form_session_id)
-          REFERENCES form_sessions(id),
-       FOREIGN KEY (user_id)
-          REFERENCES users(id),
-       UNIQUE(form_session_id, user_id)
-    )""".update
+   val formSessionInvites =
+      sql"""
+      CREATE TABLE IF NOT EXISTS form_session_invites (
+         id                     bigserial         PRIMARY KEY,
+         form_session_id        bigint            NOT NULL,
+         user_id                bigint            NOT NULL,
+         team                   text              NOT NULL DEFAULT '/',
+         accept_conditions      boolean,
+         FOREIGN KEY (form_session_id)
+            REFERENCES form_sessions(id),
+         FOREIGN KEY (user_id)
+            REFERENCES users(id),
+         UNIQUE(form_session_id, user_id)
+      )""".update
 
   val allTables = (
     users.run,
