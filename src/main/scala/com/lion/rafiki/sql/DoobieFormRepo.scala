@@ -6,7 +6,7 @@ import cats.implicits._
 import cats.syntax.all._
 import cats.effect.MonadCancel
 import cats.implicits.toFunctorOps
-import com.lion.rafiki.domain.company.Form
+import com.lion.rafiki.domain.company.{Form, QuestionAnswer, QuestionAnswerP, FormTree}
 import com.lion.rafiki.domain.{Company, RepoError, WithId}
 import com.lion.rafiki.sql.SQLPagination.paginate
 import doobie.{LogHandler, Transactor}
@@ -21,82 +21,28 @@ import doobie.util.update.Update0
 
 private[sql] object FormSQL {
   import CompanySQL._
+  import FormTreeSQL.{formTreeIdMeta, formTreeKindMeta, getTreeRecCIO, syncTree, deleteTreeQ}
   implicit val formIdMeta: Meta[Form.Id] = createMetaId(Form)
-  implicit val formTreeIdMeta: Meta[Form.Tree.Id] = createMetaId(Form.Tree)
-  implicit val formTreeQuestionAnswerIdMeta
-      : Meta[Form.Tree.Question.Answer.Id] = createMetaId(
-    Form.Tree.Question.Answer
-  )
-  implicit val formTreeKindMeta: Meta[Form.Tree.Kind] = pgEnumStringOpt(
-    "form_tree_constr",
-    s => Form.Tree.Kind.fromStringE(s).toOption,
-    _.toString.toLowerCase
-  )
+
   implicit val formRecordReader: Read[Form.Record] = Read[
     (
         Form.Id,
         Option[Company.Id],
         String,
         Option[String],
-        Option[Form.Tree.Id],
-        Option[Form.Tree.Kind]
+        Option[FormTree.Id],
+        Option[FormTree.Kind]
     )
   ]
     .map({ case (id, company, name, description, tree_id, tree_kind) =>
       Form(company, name, description, tree_id.zip(tree_kind)).withId(id)
     })
-  implicit val formTreeGroupReader: Read[WithId[Form.Tree.Id, Form.Tree.Group]] =
-    Read[Form.Tree.Id].map(id => Form.Tree.Group(List.empty[Form.Tree]).withId(id))
 
-  implicit val questionAnswerReader: Read[Form.Tree.Question.AnswerWithId] =
-    Read[
-      (Form.Tree.Question.Answer.Id, Form.Tree.Id, Option[String], Option[Int])
-    ].map({
-      case (id, _, label, Some(num_value)) =>
-        Form.Tree.Question.Answer.NumericWithId(id, label, num_value)
-      case (id, _, label, None) =>
-        Form.Tree.Question.Answer.FreeTextWithId(id, label)
-    })
-
-  implicit val questionWithKeyReader: Read[WithId[Form.Tree.Id, Form.Tree.Question]] =
-    Read[(Form.Tree.Id, String, String)].map({ case (id, label, text) =>
-      Form.Tree.Question(label, text, Nil).withId(id)
-    })
 
   implicit val han: LogHandler = LogHandler.jdkLogHandler
 
   def byIdQ(id: Form.Id) =
     sql"""SELECT * FROM forms WHERE id=$id""".query[Form.Record]
-
-  def getTreeQuestionQ(id: Form.Tree.Id) = sql"""
-     SELECT ft.id, ftq.label, ftq.text FROM form_trees ft
-       LEFT JOIN form_tree_questions ftq
-         ON (ft.id = ftq.id AND ft.kind = ftq.kind)
-       WHERE ft.id=$id
-  """.query[WithId[Form.Tree.Id, Form.Tree.Question]]
-
-  def getQuestionAnswersQ(id: Form.Tree.Id) = sql"""
-     SELECT * FROM form_tree_question_answers
-       WHERE question_id=$id
-  """.query[Form.Tree.Question.AnswerWithId]
-
-  def getTreeTextQ(id: Form.Tree.Id) = sql"""
-     SELECT ft.id, ftt.text FROM form_trees ft
-       LEFT JOIN form_tree_texts ftt
-         ON (ft.id = ftt.id AND ft.kind = ftt.kind)
-       WHERE ft.id=$id
-  """.query[WithId[Form.Tree.Id, Form.Tree.Text]]
-
-  def getTreeGroupQ(id: Form.Tree.Id) = sql"""
-     SELECT ft.id FROM form_trees ft
-       LEFT JOIN form_tree_groups ftg
-         ON (ft.id = ftg.id AND ft.kind = ftg.kind)
-       WHERE ft.id=$id
-  """.query[WithId[Form.Tree.Id, Form.Tree.Group]]
-
-  def getTreeChildKeysByIdQ(parent: Form.Tree.Key): Query0[Form.Tree.Key] =
-    sql"""SELECT id, kind FROM form_trees WHERE parent_id=${parent._1} AND parent_kind=${parent._2}"""
-      .query[Form.Tree.Key]
 
   def byCompanyIdQ(id: Company.Id) =
     sql"""SELECT * FROM forms WHERE company=$id OR company=NULL"""
@@ -106,35 +52,10 @@ private[sql] object FormSQL {
       company: Option[Company.Id],
       name: String,
       description: Option[String],
-      tree: Option[Form.Tree.Key]
+      tree: Option[FormTree.Key]
   ) = {
     val (tree_id, tree_kind) = tree.unzip
     sql"""INSERT INTO forms (company,name,description,tree_id,tree_kind) VALUES ($company,$name,$description,$tree_id,$tree_kind)""".update
-  }
-
-  def insertTreeHeaderQ(kind: Form.Tree.Kind, parent: Option[Form.Tree.Key]) = {
-    val (parent_id, parent_kind) = parent.unzip
-    sql"""INSERT INTO form_trees (kind,parent_id,parent_kind) VALUES($kind,$parent_id,$parent_kind)""".update
-  }
-
-  def insertTreeQuestionQ(id: Form.Tree.Id, label: String, text: String) = {
-    sql"""INSERT INTO form_tree_questions(id,label,text) VALUES($id,$label,$text)""".update
-  }
-
-  def insertQuestionAnswerQ(
-      question_id: Form.Tree.Id,
-      label: Option[String],
-      num_value: Option[Int]
-  ) = {
-    sql"""INSERT INTO form_tree_question_answers(question_id,label,num_value) VALUES($question_id,$label,$num_value)""".update
-  }
-
-  def insertTreeTextQ(id: Form.Tree.Id, text: String) = {
-    sql"""INSERT INTO form_tree_texts(id,text) VALUES($id,$text)""".update
-  }
-
-  def insertTreeGroupQ(id: Form.Tree.Id) = {
-    sql"INSERT INTO form_tree_groups(id) VALUES($id)".update
   }
 
   def updateQ(
@@ -142,60 +63,10 @@ private[sql] object FormSQL {
       company: Option[Company.Id],
       name: String,
       description: Option[String],
-      tree: Option[Form.Tree.Key]
+      tree: Option[FormTree.Key]
   ) = {
     val (tree_id, tree_kind) = tree.unzip
     sql"""UPDATE forms SET company=$company, name=$name, description=$description, tree_id=$tree_id, tree_kind=$tree_kind WHERE id=$id""".update
-  }
-
-  def deleteTreeQ(key: Form.Tree.Key) = {
-    // On CASCADE DELETE will remove all child elements automatically
-    sql"""DELETE FROM form_trees WHERE id=${key._1} AND kind=${key._2}""".update
-  }
-
-  def deleteTreeChildQ(parentKey: Form.Tree.Key, notIn: Seq[Form.Tree.Key]) = {
-    // On CASCADE DELETE will remove all child elements automatically
-    val (id, kind) = parentKey
-    val notInFr =
-      Seq(fr"(parent_id=$id AND parent_kind=$kind)") ++ notIn.map(key =>
-        fr0"not(id=${key._1} AND kind=${key._2})"
-      )
-    (fr"DELETE FROM form_trees" ++ whereAnd(notInFr: _*)).update
-  }
-
-  def deleteQuestionAnswerQ(
-      questionId: Form.Tree.Id,
-      notIn: Seq[Form.Tree.Question.Answer.Id]
-  ) = {
-    val notInFr =
-      Seq(fr"question_id=$questionId") ++ notIn.map(id => fr0"not(id=$id)")
-    (fr"DELETE FROM form_tree_question_answers" ++ whereAnd(notInFr: _*)).update
-  }
-
-  def updateTreeHeaderQ(key: Form.Tree.Key, parent: Option[Form.Tree.Key]) = {
-    val (parent_id, parent_kind) = parent.unzip
-    sql"UPDATE form_trees SET parent_id=$parent_id, parent_kind=$parent_kind WHERE id=${key._1} AND kind=${key._2}".update
-  }
-
-  def updateTreeQuestionQ(id: Form.Tree.Id, label: String, text: String) = {
-    sql"UPDATE form_tree_questions SET label=$label, text=$text WHERE id=$id".update
-  }
-
-  def updateQuestionAnswerQ(
-      id: Form.Tree.Question.Answer.Id,
-      question_id: Form.Tree.Id,
-      label: Option[String],
-      num_value: Option[Int]
-  ) = {
-    sql"""UPDATE form_tree_question_answers SET question_id=$question_id, label=$label, num_value=$num_value WHERE id=$id""".update
-  }
-
-  def updateTreeTextQ(id: Form.Tree.Id, text: String) = {
-    sql"UPDATE form_tree_texts SET text=$text WHERE id=$id".update
-  }
-
-  def updateTreeGroupQ(id: Form.Tree.Id) = {
-    sql"UPDATE form_tree_groups SET id=$id WHERE id=$id".update
   }
 
   def deleteQ(id: Form.Id) =
@@ -210,168 +81,12 @@ private[sql] object FormSQL {
     form <- byIdQ(id).unique
     tree <- form.data.tree.traverse(getTreeRecCIO)
   } yield form.mapData(_.copy(tree = tree))
-
-  def getTreeRecCIO(key: Form.Tree.Key): ConnectionIO[WithId[Form.Tree.Id, Form.TreeP]] = {
-    val (id, kind) = key
-    kind match {
-      case Form.Tree.Kind.Group =>
-        for {
-          group <- getTreeGroupQ(id).unique
-          childHeaders <- getTreeChildKeysByIdQ(key).to[List]
-          children <- childHeaders.traverse(getTreeRecCIO)
-        } yield group.mapData(_.copy(children = children.asInstanceOf[List[Form.Tree]]))
-      case Form.Tree.Kind.Question => (
-        for {
-          question <- getTreeQuestionQ(id).unique
-          questionAnswers <- getQuestionAnswersQ(question.id).to[List]
-        } yield question.mapData(_.copy(answers = questionAnswers))
-      )
-      case Form.Tree.Kind.Text => getTreeTextQ(id).unique.widen
-      case _                   => throw new Exception("Can't get unknown kind of tree")
-    }
-  }
-
-  def syncTree(
-      tree: Form.Tree,
-      parent: Option[Form.Tree.Key]
-  ): ConnectionIO[Form.Tree.Key] = for {
-    parentChildPairs <- addOrUpdateTreeNodesRec(tree, parent)
-    // We must wait for the update to be over before we can delete all other removed nodes
-    _ <- parentChildPairs._2.traverse(pair =>
-      deleteTreeChildQ(pair._1, pair._2).run
-    )
-    _ <- parentChildPairs._3.traverse(pair =>
-      deleteQuestionAnswerQ(pair._1, pair._2).run
-    )
-    // Same for question answers, we keep track of all question answers so in the end we can remove the remaining ones
-
-  } yield parentChildPairs._1
-
-  opaque type AccTreeNodes = List[(Form.Tree.Key, List[Form.Tree.Key])]
-  opaque type AccQuestionAnswers =
-    List[(Form.Tree.Id, List[Form.Tree.Question.Answer.Id])]
-  private def addOrUpdateTreeNodesRec(
-      tree: Form.Tree,
-      parent: Option[Form.Tree.Key]
-  ): ConnectionIO[(Form.Tree.Key, AccTreeNodes, AccQuestionAnswers)] = {
-    import Form.Tree._
-    tree match {
-      case WithId(id, g: Group) => for {
-          updatedKey <- updateTreeGroupCIO(g.withId(id), parent)
-          updatedChildrenKeys <- g.children.traverse(c =>
-            addOrUpdateTreeNodesRec(c, updatedKey.some)
-          )
-          (directChilds, parentChildPairs, questionAnswers) =
-            updatedChildrenKeys.unzip3
-        } yield (
-          updatedKey,
-          (updatedKey, directChilds) :: parentChildPairs.flatten,
-          questionAnswers.flatten
-        )
-      case WithId(id, t: Text) => updateTreeTextCIO(t.withId(id), parent).map((_, Nil, Nil))
-      case WithId(id, q: Question) => for {
-        question <- updateTreeQuestionCIO(q.withId(id), parent)
-        answers <- q.answers.traverse(syncQuestionAnswer(_, question._1))
-      } yield (question, Nil, (question._1, answers) :: Nil)
-      case g: Group =>
-        for {
-          createdKey <- insertTreeGroupCIO(g, parent)
-          childKeys <- g.children.traverse(c =>
-            addOrUpdateTreeNodesRec(c, createdKey.some)
-          )
-          (directChilds, parentChildPairs, questionAnswers) = childKeys.unzip3
-        } yield (
-          createdKey,
-          (createdKey, directChilds) :: parentChildPairs.flatten,
-          questionAnswers.flatten
-        )
-      case t: Text        => insertTreeTextCIO(t, parent).map((_, Nil, Nil))
-      case q: Question =>
-        for {
-          question <- insertTreeQuestionCIO(q, parent)
-          answers <- q.answers.traverse(syncQuestionAnswer(_, question._1))
-        } yield (question, Nil, (question._1, answers) :: Nil)
-    }
-  }
-
-  private def syncQuestionAnswer(
-      a: Form.Tree.Question.Answer,
-      questionId: Form.Tree.Id
-  ): ConnectionIO[Form.Tree.Question.Answer.Id] = a match {
-    case Form.Tree.Question.Answer.FreeText(label) =>
-      insertQuestionAnswerQ(questionId, label, None)
-        .withUniqueGeneratedKeys[Form.Tree.Question.Answer.Id]("id")
-    case Form.Tree.Question.Answer.FreeTextWithId(id, label) =>
-      updateQuestionAnswerQ(id, questionId, label, None).run.as(id)
-    case Form.Tree.Question.Answer.NumericWithId(id, label, value) =>
-      updateQuestionAnswerQ(id, questionId, label, value.some).run.as(id)
-    case Form.Tree.Question.Answer.Numeric(label, value) =>
-      insertQuestionAnswerQ(questionId, label, value.some)
-        .withUniqueGeneratedKeys[Form.Tree.Question.Answer.Id]("id")
-  }
-
-  def updateTreeGroupCIO(
-      g: WithId[Form.Tree.Id, Form.Tree.Group],
-      parent: Option[Form.Tree.Key]
-  ): ConnectionIO[Form.Tree.Key] =
-    for {
-      _ <- updateTreeHeaderQ(g.key, parent).run
-      _ <- updateTreeGroupQ(g.id).run
-    } yield g.key
-
-  def insertTreeGroupCIO(
-      g: Form.Tree.Group,
-      parent: Option[Form.Tree.Key]
-  ): ConnectionIO[Form.Tree.Key] =
-    for {
-      generatedId <- insertTreeHeaderQ(g.kind, parent)
-        .withUniqueGeneratedKeys[Form.Tree.Id]("id")
-      _ <- insertTreeGroupQ(generatedId).run
-    } yield (generatedId, g.kind)
-
-  def insertTreeTextCIO(
-      t: Form.Tree.Text,
-      parent: Option[Form.Tree.Key]
-  ): ConnectionIO[Form.Tree.Key] =
-    for {
-      generatedId <- insertTreeHeaderQ(Form.Tree.Kind.Text, parent)
-        .withUniqueGeneratedKeys[Form.Tree.Id]("id")
-      _ <- insertTreeTextQ(generatedId, t.text).run
-    } yield (generatedId, t.kind)
-
-  def updateTreeTextCIO(
-      t: WithId[Form.Tree.Id, Form.Tree.Text],
-      parent: Option[Form.Tree.Key]
-  ): ConnectionIO[Form.Tree.Key] =
-    for {
-      _ <- updateTreeHeaderQ(t.key, parent).run
-      _ <- updateTreeTextQ(t.id, t.data.text).run
-    } yield t.key
-
-  def insertTreeQuestionCIO(
-      q: Form.Tree.Question,
-      parent: Option[Form.Tree.Key]
-  ): ConnectionIO[Form.Tree.Key] =
-    for {
-      generatedId <- insertTreeHeaderQ(q.kind, parent)
-        .withUniqueGeneratedKeys[Form.Tree.Id]("id")
-      _ <- insertTreeQuestionQ(generatedId, q.label, q.text).run
-    } yield (generatedId, q.kind)
-
-  def updateTreeQuestionCIO(
-      q: WithId[Form.Tree.Id, Form.Tree.Question],
-      parent: Option[Form.Tree.Key]
-  ): ConnectionIO[Form.Tree.Key] =
-    for {
-      _ <- updateTreeHeaderQ(q.key, parent).run
-      _ <- updateTreeQuestionQ(q.id, q.data.label, q.data.text).run
-    } yield q.key
-
 }
 
 class DoobieFormRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
     extends Form.Repo[F] {
   import FormSQL._
+  import FormTreeSQL.{deleteTreeQ, syncTree}
   import RepoError.ConnectionIOwithErrors
 
   override def create(form: Form.Create): Result[Form.Full] = (for {
