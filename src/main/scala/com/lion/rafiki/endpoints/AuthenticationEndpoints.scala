@@ -16,11 +16,11 @@ class AuthenticationEndpoints[F[_]: Async] extends Http4sDsl[F]  {
   def endpoints(userAuth: UserAuth[F], clock: java.time.Clock): HttpRoutes[F] =
     HttpRoutes.of[F] {
       case req @ POST -> Root / "login" =>
-        val action = for {
+        val action = for
           userCreds <- req.attemptAs[UserCredentials].leftMap(ValidationError.Decoding)
           user <- userAuth.validateCredentials(userCreds)
           userRole <- userAuth.role(user).leftMap[ValidationError](ValidationError.Auth)
-        } yield (user, userRole)
+        yield (user, userRole)
 
         action.value.flatMap {
           case Right(user) =>

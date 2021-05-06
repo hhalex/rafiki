@@ -52,21 +52,21 @@ object User extends TaggedId[UserId] {
   class Service[F[_]: Monad](repo: Repo[F], passwordHasher: PasswordHasher[F]) {
     type Result[T] = EitherT[F, ValidationError, T]
     def create(user: Create): Result[Full] =
-      for {
+      for
         hashedPassword <- passwordHasher.hashPwd(user.password).leftMap[ValidationError](ValidationError.Password)
         saved <- repo.create(user.copy(password = hashedPassword)).leftMap[ValidationError](ValidationError.Repo)
-      } yield saved
+      yield saved
 
     def getById(userId: Id): Result[Full] =
       repo.get(userId).leftMap[ValidationError](ValidationError.Repo)
 
     def getByName(email: String): Result[Full] = repo.findByUserName(email).leftMap[ValidationError] (ValidationError.Repo)
 
-    def validateCredentials(email: String, password: String): Result[Full] = for {
+    def validateCredentials(email: String, password: String): Result[Full] = for
       user <- repo.findByUserName(email).leftMap[ValidationError] (ValidationError.Repo)
       isValidPassword <- passwordHasher.checkPwd(password, user.data.password).leftMap[ValidationError](ValidationError.Password)
-      _ <- if (isValidPassword) EitherT.rightT[F, ValidationError](()) else EitherT.leftT[F, Unit](ValidationError.UserCredentialsIncorrect: ValidationError)
-    } yield user
+      _ <- if isValidPassword then EitherT.rightT[F, ValidationError](()) else EitherT.leftT[F, Unit](ValidationError.UserCredentialsIncorrect: ValidationError)
+    yield user
 
     def delete(userId: Id): F[Unit] =
       repo.delete(userId).value.void
@@ -75,10 +75,10 @@ object User extends TaggedId[UserId] {
       repo.deleteByUserName(userName).leftMap[ValidationError](ValidationError.Repo)
 
     def update(user: Update): Result[Full] =
-      for {
-        password <- EitherT.liftF(if (user.data.password == "") None.pure[F] else passwordHasher.hashPwd(user.data.password).toOption.value)
+      for
+        password <-  EitherT.liftF(if user.data.password == "" then None.pure[F] else passwordHasher.hashPwd(user.data.password).toOption.value)
         saved <- repo.update(user.mapData(_.copy(password = password))).leftMap[ValidationError](ValidationError.Repo)
-      } yield saved
+      yield saved
 
     def list(pageSize: Int, offset: Int): Result[List[Full]] =
       repo.list(pageSize, offset).leftMap[ValidationError](ValidationError.Repo)

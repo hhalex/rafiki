@@ -77,10 +77,10 @@ private[sql] object FormSQL {
       sql"SELECT * FROM forms".query[Form.Record]
     )
 
-  def getCIO(id: Form.Id): ConnectionIO[Form.Full] = for {
+  def getCIO(id: Form.Id): ConnectionIO[Form.Full] = for
     form <- byIdQ(id).unique
     tree <- form.data.tree.traverse(getTreeRecCIO)
-  } yield form.mapData(_.copy(tree = tree))
+  yield form.mapData(_.copy(tree = tree))
 }
 
 class DoobieFormRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
@@ -89,14 +89,14 @@ class DoobieFormRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
   import FormTreeSQL.{deleteTreeQ, syncTree}
   import RepoError.ConnectionIOwithErrors
 
-  override def create(form: Form.Create): Result[Form.Full] = (for {
+  override def create(form: Form.Create): Result[Form.Full] = (for
     createdTreeKey <- form.tree.traverse(t => syncTree(t, None))
     id <- insertQ(form.company, form.name, form.description, createdTreeKey)
       .withUniqueGeneratedKeys[Form.Id]("id")
     createdForm <- getCIO(id)
-  } yield createdForm).toResult().transact(xa)
+  yield createdForm).toResult().transact(xa)
 
-  override def update(form: Form.Update): Result[Form.Full] = (for {
+  override def update(form: Form.Update): Result[Form.Full] = (for
     updateTreeKey <- form.data.tree.traverse(t => syncTree(t, None))
     _ <- updateQ(
       form.id,
@@ -106,16 +106,16 @@ class DoobieFormRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
       updateTreeKey
     ).run
     updatedForm <- getCIO(form.id)
-  } yield updatedForm).toResult().transact(xa)
+  yield updatedForm).toResult().transact(xa)
 
   override def get(id: Form.Id): Result[Form.Full] =
     getCIO(id).toResult().transact(xa)
 
-  override def delete(id: Form.Id): Result[Unit] = (for {
+  override def delete(id: Form.Id): Result[Unit] = (for
     form <- byIdQ(id).unique
     _ <- deleteQ(form.id).run
     _ <- form.data.tree.traverse(t => deleteTreeQ(t).run)
-  } yield ()).toResult().transact(xa)
+  yield ()).toResult().transact(xa)
 
   override def list(pageSize: Int, offset: Int): Result[List[Form.Record]] =
     listAllQ(pageSize: Int, offset: Int).to[List].toResult().transact(xa)

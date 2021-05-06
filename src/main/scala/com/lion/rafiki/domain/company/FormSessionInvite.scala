@@ -53,48 +53,48 @@ object FormSessionInvite extends TaggedId[InviteId] {
     override def canCreateSessionInvite(formId: FormSession.Id, companyId: Company.Id) =
       formSessionValidation.hasOwnership(formId, companyId)
 
-    override def hasOwnership(id: Id, companyId: Company.Id) = for {
+    override def hasOwnership(id: Id, companyId: Company.Id) = for
       formSessionInvite <- repo.get(id).leftMap(ValidationError.Repo)
       _ <- formSessionValidation.hasOwnership(formSessionInvite._1, companyId)
-    } yield formSessionInvite._2
+    yield formSessionInvite._2
   }
 
   class Service[F[_] : Monad](repo: Repo[F], validation: Validation[F], formSessionValidation: FormSession.Validation[F], userService: User.Service[F]) {
     type Result[T] = EitherT[F, ValidationError, T]
 
-    def create(formSessionInvite: FormSessionInvite[String], formSessionId: FormSession.Id, companyId: Company.Id): Result[Full] = for {
+    def create(formSessionInvite: FormSessionInvite[String], formSessionId: FormSession.Id, companyId: Company.Id): Result[Full] = for
       _ <- validation.canCreateSessionInvite(formSessionId, companyId)
       user <- userService.getByName(formSessionInvite.user)
         .orElse(userService.create(User[String](None, None, formSessionInvite.user, "pass")))
       createdFormSessionInvite <- repo.create(formSessionInvite.copy(user = user.id), formSessionId)
         .leftMap[ValidationError](ValidationError.Repo)
-    } yield createdFormSessionInvite.mapData(_.copy(user = user))
+    yield createdFormSessionInvite.mapData(_.copy(user = user))
 
     def getById(formSessionInviteId: Id, companyId: Company.Id): Result[RecordWithEmail] =
       validation.hasOwnership(formSessionInviteId, companyId)
 
-    def delete(formSessionInviteId: Id, companyId: Company.Id): Result[Unit] = for {
+    def delete(formSessionInviteId: Id, companyId: Company.Id): Result[Unit] = for
       _ <- validation.hasOwnership(formSessionInviteId, companyId)
       _ <- repo.delete(formSessionInviteId).leftMap[ValidationError](ValidationError.Repo)
-    } yield ()
+    yield ()
 
-    def update(formSessionInvite: RecordWithEmail, companyId: Company.Id): Result[Record] = for {
+    def update(formSessionInvite: RecordWithEmail, companyId: Company.Id): Result[Record] = for
       _ <- validation.hasOwnership(formSessionInvite.id, companyId)
       user <- userService.getByName(formSessionInvite.data.user)
         .orElse(userService.create(User[String](None, None, formSessionInvite.data.user, "pass")))
       result <- repo.update(formSessionInvite.mapData(_.copy(user = user.id)))
         .leftMap[ValidationError](ValidationError.Repo)
-    } yield result
+    yield result
 
-    def listByFormSession(formSessionId: FormSession.Id, companyId: Company.Id, pageSize: Int, offset: Int): Result[List[RecordWithEmail]] = for {
+    def listByFormSession(formSessionId: FormSession.Id, companyId: Company.Id, pageSize: Int, offset: Int): Result[List[RecordWithEmail]] = for
       _ <- formSessionValidation.hasOwnership(formSessionId, companyId)
       list <- repo.listByFormSession(formSessionId, pageSize, offset).leftMap[ValidationError](ValidationError.Repo)
-    } yield list
+    yield list
 
-    def getByFormSession(formSessionId: FormSession.Id, companyId: Company.Id): Result[List[RecordWithEmail]] = for {
+    def getByFormSession(formSessionId: FormSession.Id, companyId: Company.Id): Result[List[RecordWithEmail]] = for
       _ <- formSessionValidation.hasOwnership(formSessionId, companyId)
       list <- repo.getByFormSession(formSessionId).leftMap[ValidationError](ValidationError.Repo)
-    } yield list
+    yield list
   }
 }
 

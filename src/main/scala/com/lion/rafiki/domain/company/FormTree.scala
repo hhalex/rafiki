@@ -19,59 +19,40 @@ type FormTree = FormTreeP | WithId[FormTree.Id, FormTreeP]
 
 trait FormTreeId
 object FormTree extends TaggedId[FormTreeId] {
+  enum Kind:
+    case Question, Group, Text
 
-  extension [T <: FormTreeP](tree: T) {
-    def withId(id: FormTree.Id) = WithId(id, tree)
-    def kind: FormTree.Kind = tree match {
-      case _: FormTree.Text        => FormTree.Kind.Text
-      case _: FormTree.Question  => FormTree.Kind.Question
-      case _: FormTree.Group       => FormTree.Kind.Group
-    }
+  object Kind:
+    def fromStringE(s: String) = s match
+      case "question" => Kind.Question.asRight
+      case "group"    => Kind.Group.asRight
+      case "text"     => Kind.Text.asRight
+      case other => Left(s"'$other' is not a member value of FormTree.Kind")
+    implicit val formTreeKindDecoder: Decoder[Kind] = Decoder[String].emap(Kind.fromStringE)
+    implicit val formTreeKindEncoder: Encoder[Kind] = Encoder[String].contramap(_.toString)
 
-    def labels: Set[String] = {
-      def rec(t: FormTreeP): List[String] = t match {
-        case FormTree.Question(label, _, _)    => List(label)
-        case _: FormTree.Text                  => Nil
-        case FormTree.Group(children)          => children.flatMap({
+  extension [T <: FormTreeP](tree: T)
+    def withId(id: Id) = WithId(id, tree)
+    def kind: Kind = tree match
+      case _: Text        => Kind.Text
+      case _: Question  => Kind.Question
+      case _: Group       => Kind.Group
+
+    def labels: Set[String] =
+      def rec(t: FormTreeP): List[String] = t match
+        case Question(label, _, _)    => List(label)
+        case _: Text                  => Nil
+        case Group(children)          => children.flatMap({
           case WithId(id, treeP) => rec(treeP)
           case treeP: FormTreeP => rec(treeP)
         })
-      }
       rec(tree).toSet
-    }
-  }
+    end labels
 
-extension [T <: FormTreeP](treeWithId: WithId[FormTree.Id, T]) {
+  extension [T <: FormTreeP](treeWithId: WithId[FormTree.Id, T])
     def key = (treeWithId.id, treeWithId.data.kind)
-    def kind: FormTree.Kind = treeWithId.data.kind
+    def kind: Kind = treeWithId.data.kind
     def labels: Set[String] = treeWithId.data.labels
-  }
-
-  sealed trait Kind
-  object Kind {
-    case object Question extends Kind
-    case object Group extends Kind
-    case object Text extends Kind
-    case class Unknown(s: String) extends Kind
-
-    implicit val formTreeKindDecoder: Decoder[Kind] =
-      Decoder[String].emap(Kind.fromStringE)
-    implicit val formTreeKindEncoder: Encoder[Kind] =
-      Encoder[String].contramap(_.toString)
-
-    def fromString(s: String): Kind = s.toLowerCase match {
-      case "question" => Kind.Question
-      case "group"    => Kind.Group
-      case "text"     => Kind.Text
-      case other      => Kind.Unknown(other)
-    }
-
-    def fromStringE(s: String) = fromString(s) match {
-      case Unknown(other) =>
-        Left(s"'$other' is not a member value of Form.Tree.Kind")
-      case treeKind => Right(treeKind)
-    }
-  }
 
   type Key = (Id, Kind)
 

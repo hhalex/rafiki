@@ -22,10 +22,10 @@ class CompanyEndpoints[F[_]: Async] extends Http4sDsl[F] {
       AuthedRoutes.of[User.Authed, F] {
         // Create company
         case req @ POST -> Root / CompanyRoute as _ =>
-          val action = for {
+          val action = for
             companyWithUser <- req.req.attemptAs[Company.Create].leftMap(ValidationError.Decoding)
             result <- companyService.create(companyWithUser)
-          } yield result
+          yield result
 
           action.value.flatMap {
             case Right(createdCompanyAndUser) => Ok(createdCompanyAndUser)
@@ -33,10 +33,10 @@ class CompanyEndpoints[F[_]: Async] extends Http4sDsl[F] {
           }
         // Update company
         case req @ PUT -> Root / CompanyRoute / CompanyIdVar(id) as _ =>
-          val action = for {
+          val action = for
             company <- req.req.attemptAs[Company.Create].leftMap(ValidationError.Decoding)
             result <- companyService.update(company.withId(id))
-          } yield result
+          yield result
 
           action.value.flatMap {
             case Right(saved) => Ok(saved)
@@ -64,10 +64,10 @@ class CompanyEndpoints[F[_]: Async] extends Http4sDsl[F] {
           // TODO: Change REST api for company contracts
         // Create company contract
         case req @ POST -> Root / CompanyRoute / CompanyIdVar(companyId) / CompanyContractRoute as _ =>
-          val action = for {
+          val action = for
             contract <- req.req.attemptAs[CompanyContract.CreateRecord].leftMap(ValidationError.Decoding)
             result <- companyContractService.create(contract.copy(company = companyId))
-          } yield result
+          yield result
 
           action.value.flatMap {
             case Right(createdCompanyContract) => Ok(createdCompanyContract)
@@ -75,10 +75,10 @@ class CompanyEndpoints[F[_]: Async] extends Http4sDsl[F] {
           }
         // Update company contract
         case req @ PUT -> Root / CompanyRoute / CompanyIdVar(companyId) / CompanyContractRoute / CompanyContractIdVar(contractId) as _ =>
-          val action = for {
+          val action = for
             companyContract <- req.req.attemptAs[CompanyContract.CreateRecord].leftMap(ValidationError.Decoding)
             result <- companyContractService.update(companyContract.copy(company = companyId).withId(contractId))
-          } yield result
+          yield result
 
           action.value.flatMap {
             case Right(saved) => Ok(saved)

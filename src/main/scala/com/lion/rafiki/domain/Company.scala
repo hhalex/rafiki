@@ -39,24 +39,24 @@ object Company extends TaggedId[CompanyId] {
   class Service[F[_]: Monad](companyRepo: Repo[F], userService: User.Service[F]) {
     type Result[T] = EitherT[F, ValidationError, T]
     def create(company: Create): Result[Full] =
-      for {
+      for
         createdUser <- userService.create(company.rh_user)
         saved <- companyRepo.create(company.copy(rh_user = createdUser.id)).leftMap[ValidationError](ValidationError.Repo)
-      } yield saved.mapData(_.copy(rh_user = createdUser.data))
+      yield saved.mapData(_.copy(rh_user = createdUser.data))
 
     def update(company: Update): Result[Full] =
-      for {
+      for
         companyUserId <- companyRepo.get(company.id).map(_.data.rh_user).leftMap[ValidationError](ValidationError.Repo)
         updatedUser <- userService.update(company.data.rh_user.withId(companyUserId))
         fullCompany = company.mapData(_.copy(rh_user = updatedUser.id))
         saved <- companyRepo.update(fullCompany).leftMap[ValidationError](ValidationError.Repo)
-      } yield saved.mapData(_.copy(rh_user = updatedUser.data))
+      yield saved.mapData(_.copy(rh_user = updatedUser.data))
 
     def get(id: Id): Result[Full] =
-      for {
+      for
         company <- companyRepo.get(id).leftMap[ValidationError](ValidationError.Repo)
         user <- userService.getById(company.data.rh_user)
-      } yield company.mapData(_.copy(rh_user = user.data))
+      yield company.mapData(_.copy(rh_user = user.data))
 
     def delete(id: Id): Result[Unit] = companyRepo.delete(id).leftMap[ValidationError](ValidationError.Repo)
 

@@ -85,7 +85,7 @@ object CompanyContract extends TaggedId[ContractId] {
     override def hasOwnership(
         companyContractId: domain.CompanyContract.Id,
         companyId: Option[Company.Id]
-    ): EitherT[F, ValidationError, Record] = for {
+    ): EitherT[F, ValidationError, Record] = for
       repoContract <- repo.get(companyContractId).leftMap(ValidationError.Repo)
       success = EitherT.rightT[F, ValidationError](repoContract)
       _ <- companyId match {
@@ -93,7 +93,7 @@ object CompanyContract extends TaggedId[ContractId] {
         case Some(_)                                     => notAllowed
         case None                                        => success
       }
-    } yield repoContract
+    yield repoContract
   }
 
   class Service[F[_]: Monad](companyContractRepo: Repo[F]) {

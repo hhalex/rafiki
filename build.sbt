@@ -43,9 +43,11 @@ scalacOptions ++= Seq(
   "-encoding", "UTF-8",
   "-feature",
   "-Ykind-projector",
-  "-language:postfixOps",
+  "-Xsemanticdb",
+  "-new-syntax",
   "-Ysafe-init",
   "-unchecked",
-  "-source:3.0-migration"
+  "-Xmigration",
+  "-rewrite"
 )
 enablePlugins(JavaServerAppPackaging)

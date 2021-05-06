@@ -15,9 +15,9 @@ object WithId {
 
   def decoder[Id: Decoder, A: Decoder]: Decoder[WithId[Id, A]] =
     Decoder.instance { wId =>
-      for {
+      for
         id <- wId.downField("id").as[Id]
         data <- wId.value.as[A]
-      } yield new WithId(id, data)
+      yield new WithId(id, data)
     }
 }

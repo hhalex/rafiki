@@ -100,7 +100,7 @@ object FormSession extends TaggedId[SessionId] {
               }
           case _ => contractFull
         }
-      for {
+      for
         _ <- formValidation.hasOwnership(formId, companyId.some)
         contracts <- companyContractRepo
           .getByCompany(companyId)
@@ -112,13 +112,13 @@ object FormSession extends TaggedId[SessionId] {
               prec.flatMap(_ => checkContractIdValid(record))
             )
         }
-      } yield validContract
+      yield validContract
     }
 
-    override def hasOwnership(id: Id, companyId: Company.Id) = for {
+    override def hasOwnership(id: Id, companyId: Company.Id) = for
       formSession <- repo.get(id).leftMap(ValidationError.Repo)
       _ <- formValidation.hasOwnership(formSession.data.formId, companyId.some)
-    } yield formSession
+    yield formSession
   }
 
   class Service[F[_]: Monad](repo: Repo[F], validation: Validation[F]) {
@@ -128,12 +128,12 @@ object FormSession extends TaggedId[SessionId] {
         formSession: Create,
         formId: Form.Id,
         companyId: Company.Id
-    ): Result[Full] = for {
+    ): Result[Full] = for
       contract <- validation.canCreateSession(formId, companyId)
       createdFormSession <- repo
         .create(formSession.copy(formId = formId), contract.id)
         .leftMap[ValidationError](ValidationError.Repo)
-    } yield createdFormSession
+    yield createdFormSession
 
     def getById(formSessionId: Id, companyId: Company.Id): Result[Full] =
       validation.hasOwnership(formSessionId, companyId)
@@ -143,19 +143,19 @@ object FormSession extends TaggedId[SessionId] {
     ): Result[List[Record]] =
       repo.getByCompanyContract(companyId).leftMap(ValidationError.Repo)
 
-    def delete(formSessionId: Id, companyId: Company.Id): Result[Unit] = for {
+    def delete(formSessionId: Id, companyId: Company.Id): Result[Unit] = for
       _ <- validation.hasOwnership(formSessionId, companyId)
       _ <- repo
         .delete(formSessionId)
         .leftMap[ValidationError](ValidationError.Repo)
-    } yield ()
+    yield ()
 
-    def update(formSession: Update, companyId: Company.Id): Result[Full] = for {
+    def update(formSession: Update, companyId: Company.Id): Result[Full] = for
       _ <- validation.hasOwnership(formSession.id, companyId)
       result <- repo
         .update(formSession)
         .leftMap[ValidationError](ValidationError.Repo)
-    } yield result
+    yield result
 
     def listByCompany(
         companyId: Company.Id,

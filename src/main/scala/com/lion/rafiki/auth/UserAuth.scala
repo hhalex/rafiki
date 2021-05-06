@@ -25,11 +25,11 @@ class HotUserStore[F[_]: Monad](hotUsers: Seq[UserCredentials], passwordHasher: 
 
   def isMember(u: User.Authed) = OptionT(hotUsersList.map(_.find(_._1 == u.email))).as(u)
 
-  def validateCredentials(creds: UserCredentials): EitherT[F, AuthError, User.Authed] = for {
+  def validateCredentials(creds: UserCredentials): EitherT[F, AuthError, User.Authed] = for
     user <- EitherT.fromOptionF(hotUsersList.map(_.find(_._1 == creds.username)), AuthError.UserNotFound)
     isValidPassword <- passwordHasher.checkPwd(creds.password, user._2).leftMap[AuthError](AuthError.Password)
-    _ <- EitherT.fromOption(if (isValidPassword) user._1.some else None, AuthError.InvalidPassword: AuthError)
-  } yield User.Authed(user._1)
+    _ <- EitherT.fromOption(if isValidPassword then user._1.some else None, AuthError.InvalidPassword: AuthError)
+  yield User.Authed(user._1)
 }
 
 class UserAuth[F[_]: Sync](userService: User.Service[F], companyRepo: Company.Repo[F], hotUserStore: HotUserStore[F], crypto: CryptoBits) {
@@ -53,10 +53,10 @@ class UserAuth[F[_]: Sync](userService: User.Service[F], companyRepo: Company.Re
       .orElse(resolveCompany.as("Company").run(u))
 
   private val auth: Kleisli[Result, Request[F], User.Authed] = Kleisli { (request: Request[F]) => EitherT.fromEither[F] {
-    for {
+    for
       header <- request.headers.get[Authorization].toRight[AuthError](AuthError.AuthorizationTokenNotFound)
       userEmail <- crypto.validateSignedToken(header.credentials.asInstanceOf[Credentials.Token].token).toRight[AuthError](AuthError.InvalidToken)
-    } yield User.Authed(userEmail)
+    yield User.Authed(userEmail)
   }}
 
   private val resolveAdmin: Kleisli[Result, User.Authed, User.Authed] =

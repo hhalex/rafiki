@@ -37,9 +37,9 @@ object Conf {
         val username = dbUri.getUserInfo.split(":")(0)
         val password = dbUri.getUserInfo.split(":")(1)
         val dbUrl =
-          "jdbc:postgresql://" + dbUri.getHost + ':' + dbUri.getPort + dbUri.getPath + (if (
+          "jdbc:postgresql://" + dbUri.getHost + ':' + dbUri.getPort + dbUri.getPath + (if
                                                                                           devMode
-                                                                                        ) ""
+                                                                                        then ""
                                                                                         else
                                                                                           "?sslmode=require")
         F.pure(

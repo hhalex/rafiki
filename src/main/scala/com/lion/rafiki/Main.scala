@@ -41,7 +41,7 @@ import scala.concurrent.ExecutionContext.global
 object Main extends IOApp {
   def run(args: List[String]) = {
 
-    for {
+    for
       conf <- Stream.eval(Conf[IO]())
       xa = Transactor.fromDriverManager[IO](
         "org.postgresql.Driver",
@@ -137,6 +137,6 @@ object Main extends IOApp {
           .withHttpApp(Logger.httpApp[IO](true, true)(httpApp))
           .serve
       }
-    } yield exitCode
+    yield exitCode
   }.drain.compile.drain.as(ExitCode.Success)
 }

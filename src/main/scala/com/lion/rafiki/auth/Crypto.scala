@@ -8,7 +8,7 @@ case class PrivateKey(key: Array[Byte])
 case class CryptoBits(key: PrivateKey) {
   private def convertBytesToHex(bytes: Seq[Byte]): String = {
     val sb = new StringBuilder
-    for (b <- bytes) {
+    for b <- bytes do {
       sb.append(String.format("%02x", Byte.box(b)))
     }
     sb.toString
@@ -32,7 +32,7 @@ case class CryptoBits(key: PrivateKey) {
     new String(bytes).split("-", 3) match {
       case Array(signature, nonce, raw) => {
         val signed = sign(nonce + "-" + raw)
-        if(constantTimeEquals(signature, signed)) Some(raw) else None
+        if constantTimeEquals(signature, signed) then Some(raw) else None
       }
       case _ => None
     }
@@ -40,13 +40,12 @@ case class CryptoBits(key: PrivateKey) {
 
   private def constantTimeEquals(a: String, b: String): Boolean = {
     var equal = 0
-    for (i <- 0 until (a.length min b.length)) {
+    for i <- 0 until (a.length min b.length) do {
       equal |= a(i) ^ b(i)
     }
-    if (a.length != b.length) {
+    if a.length != b.length then
       false
-    } else {
+    else
       equal == 0
-    }
   }
 }

@@ -21,7 +21,7 @@ import doobie.util.update.Update0
 
 private[sql] object FormTreeSQL {
 
-    implicit val formTreeIdMeta: Meta[FormTree.Id] = createMetaId(FormTree)
+  implicit val formTreeIdMeta: Meta[FormTree.Id] = createMetaId(FormTree)
   implicit val formTreeQuestionAnswerIdMeta
       : Meta[QuestionAnswer.Id] = createMetaId(QuestionAnswer)
   implicit val formTreeKindMeta: Meta[FormTree.Kind] = pgEnumStringOpt(
@@ -29,7 +29,7 @@ private[sql] object FormTreeSQL {
     s => FormTree.Kind.fromStringE(s).toOption,
     _.toString.toLowerCase
   )
-    implicit val formTreeGroupReader: Read[WithId[FormTree.Id, FormTree.Group]] =
+  implicit val formTreeGroupReader: Read[WithId[FormTree.Id, FormTree.Group]] =
     Read[FormTree.Id].map(id => FormTree.Group(List.empty[FormTree]).withId(id))
 
   implicit val questionAnswerReader: Read[WithId[QuestionAnswer.Id, QuestionAnswerP]] =
@@ -158,16 +158,16 @@ private[sql] object FormTreeSQL {
     val (id, kind) = key
     kind match {
       case FormTree.Kind.Group =>
-        for {
+        for
           group <- getTreeGroupQ(id).unique
           childHeaders <- getTreeChildKeysByIdQ(key).to[List]
           children <- childHeaders.traverse(getTreeRecCIO)
-        } yield group.mapData(_.copy(children = children.asInstanceOf[List[FormTree]]))
+        yield group.mapData(_.copy(children = children.asInstanceOf[List[FormTree]]))
       case FormTree.Kind.Question => (
-        for {
+        for
           question <- getTreeQuestionQ(id).unique
           questionAnswers <- getQuestionAnswersQ(question.id).to[List]
-        } yield question.mapData(_.copy(answers = questionAnswers))
+        yield question.mapData(_.copy(answers = questionAnswers))
       )
       case FormTree.Kind.Text => getTreeTextQ(id).unique.widen
       case _                   => throw new Exception("Can't get unknown kind of tree")
@@ -177,7 +177,7 @@ private[sql] object FormTreeSQL {
   def syncTree(
       tree: FormTree,
       parent: Option[FormTree.Key]
-  ): ConnectionIO[FormTree.Key] = for {
+  ): ConnectionIO[FormTree.Key] = for
     parentChildPairs <- addOrUpdateTreeNodesRec(tree, parent)
     // We must wait for the update to be over before we can delete all other removed nodes
     _ <- parentChildPairs._2.traverse(pair =>
@@ -188,7 +188,7 @@ private[sql] object FormTreeSQL {
     )
     // Same for question answers, we keep track of all question answers so in the end we can remove the remaining ones
 
-  } yield parentChildPairs._1
+  yield parentChildPairs._1
 
   opaque type AccTreeNodes = List[(FormTree.Key, List[FormTree.Key])]
   opaque type AccQuestionAnswers =
@@ -199,41 +199,41 @@ private[sql] object FormTreeSQL {
   ): ConnectionIO[(FormTree.Key, AccTreeNodes, AccQuestionAnswers)] = {
     import FormTree._
     tree match {
-      case WithId(id, g: Group) => for {
+      case WithId(id, g: Group) => for
           updatedKey <- updateTreeGroupCIO(g.withId(id), parent)
           updatedChildrenKeys <- g.children.traverse(c =>
             addOrUpdateTreeNodesRec(c, updatedKey.some)
           )
           (directChilds, parentChildPairs, questionAnswers) =
             updatedChildrenKeys.unzip3
-        } yield (
+        yield (
           updatedKey,
           (updatedKey, directChilds) :: parentChildPairs.flatten,
           questionAnswers.flatten
         )
       case WithId(id, t: Text) => updateTreeTextCIO(t.withId(id), parent).map((_, Nil, Nil))
-      case WithId(id, q: Question) => for {
+      case WithId(id, q: Question) => for
         question <- updateTreeQuestionCIO(q.withId(id), parent)
         answers <- q.answers.traverse(syncQuestionAnswer(_, question._1))
-      } yield (question, Nil, (question._1, answers) :: Nil)
+      yield (question, Nil, (question._1, answers) :: Nil)
       case g: Group =>
-        for {
+        for
           createdKey <- insertTreeGroupCIO(g, parent)
           childKeys <- g.children.traverse(c =>
             addOrUpdateTreeNodesRec(c, createdKey.some)
           )
           (directChilds, parentChildPairs, questionAnswers) = childKeys.unzip3
-        } yield (
+        yield (
           createdKey,
           (createdKey, directChilds) :: parentChildPairs.flatten,
           questionAnswers.flatten
         )
       case t: Text        => insertTreeTextCIO(t, parent).map((_, Nil, Nil))
       case q: Question =>
-        for {
+        for
           question <- insertTreeQuestionCIO(q, parent)
           answers <- q.answers.traverse(syncQuestionAnswer(_, question._1))
-        } yield (question, Nil, (question._1, answers) :: Nil)
+        yield (question, Nil, (question._1, answers) :: Nil)
     }
   }
 
@@ -257,57 +257,57 @@ private[sql] object FormTreeSQL {
       g: WithId[FormTree.Id, FormTree.Group],
       parent: Option[FormTree.Key]
   ): ConnectionIO[FormTree.Key] =
-    for {
+    for
       _ <- updateTreeHeaderQ(g.key, parent).run
       _ <- updateTreeGroupQ(g.id).run
-    } yield g.key
+    yield g.key
 
   def insertTreeGroupCIO(
       g: FormTree.Group,
       parent: Option[FormTree.Key]
   ): ConnectionIO[FormTree.Key] =
-    for {
+    for
       generatedId <- insertTreeHeaderQ(g.kind, parent)
         .withUniqueGeneratedKeys[FormTree.Id]("id")
       _ <- insertTreeGroupQ(generatedId).run
-    } yield (generatedId, g.kind)
+    yield (generatedId, g.kind)
 
   def insertTreeTextCIO(
       t: FormTree.Text,
       parent: Option[FormTree.Key]
   ): ConnectionIO[FormTree.Key] =
-    for {
+    for
       generatedId <- insertTreeHeaderQ(FormTree.Kind.Text, parent)
         .withUniqueGeneratedKeys[FormTree.Id]("id")
       _ <- insertTreeTextQ(generatedId, t.text).run
-    } yield (generatedId, t.kind)
+    yield (generatedId, t.kind)
 
   def updateTreeTextCIO(
       t: WithId[FormTree.Id, FormTree.Text],
       parent: Option[FormTree.Key]
   ): ConnectionIO[FormTree.Key] =
-    for {
+    for
       _ <- updateTreeHeaderQ(t.key, parent).run
       _ <- updateTreeTextQ(t.id, t.data.text).run
-    } yield t.key
+    yield t.key
 
   def insertTreeQuestionCIO(
       q: FormTree.Question,
       parent: Option[FormTree.Key]
   ): ConnectionIO[FormTree.Key] =
-    for {
+    for
       generatedId <- insertTreeHeaderQ(q.kind, parent)
         .withUniqueGeneratedKeys[FormTree.Id]("id")
       _ <- insertTreeQuestionQ(generatedId, q.label, q.text).run
-    } yield (generatedId, q.kind)
+    yield (generatedId, q.kind)
 
   def updateTreeQuestionCIO(
       q: WithId[FormTree.Id, FormTree.Question],
       parent: Option[FormTree.Key]
   ): ConnectionIO[FormTree.Key] =
-    for {
+    for
       _ <- updateTreeHeaderQ(q.key, parent).run
       _ <- updateTreeQuestionQ(q.id, q.data.label, q.data.text).run
-    } yield q.key
+    yield q.key
 
 }
