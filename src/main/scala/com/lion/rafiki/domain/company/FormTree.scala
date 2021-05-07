@@ -65,14 +65,10 @@ object FormTree extends TaggedId[FormTreeId] {
   case class Group(children: List[FormTree])
 
 // Decoding
-  implicit val treeGroupDecoder: Decoder[Group] = deriveDecoder
-  implicit val treeTextDecoder: Decoder[Text] = deriveDecoder
-  implicit val treeQuestionDecoder: Decoder[Question] = deriveDecoder
-
   implicit val formTreePDecoder: Decoder[FormTreeP] =
-    Decoder[Question].widen
-      .or(Decoder[Text].widen)
-      .or(Decoder[Group].widen)
+    deriveDecoder[Question].widen
+      .or(deriveDecoder[Text].widen)
+      .or(deriveDecoder[Group].widen)
 
   implicit val formTreeIdDecoder: Decoder[WithId[FormTree.Id, FormTreeP]] =
     WithId.decoder
@@ -82,14 +78,10 @@ object FormTree extends TaggedId[FormTreeId] {
       .or(Decoder[FormTreeP].widen)
 
 // Encoding
-  implicit val treeGroupEncoder: Encoder[Group] = deriveEncoder
-  implicit val treeTextEncoder: Encoder[Text] = deriveEncoder
-  implicit val treeQuestionEncoder: Encoder[Question] = deriveEncoder
-
   implicit val formTreePEncoder: Encoder[FormTreeP] = Encoder.instance {
-    case r: Text     => r.asJson
-    case r: Question => r.asJson
-    case r: Group    => r.asJson
+    case r: Text     => r.asJson(deriveEncoder[Text])
+    case r: Question => r.asJson(deriveEncoder[Question])
+    case r: Group    => r.asJson(deriveEncoder[Group])
   }
 
   implicit val formTreeIdEncoder: Encoder[WithId[FormTree.Id, FormTreeP]] =
