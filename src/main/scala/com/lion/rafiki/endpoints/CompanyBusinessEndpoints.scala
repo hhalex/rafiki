@@ -95,6 +95,20 @@ class CompanyBusinessEndpoints[F[_]: Async] extends Http4sDsl[F] {
             case Right(saved) => Ok(saved)
             case Left(err) => BadRequest(s"Error '$err' while updating form session.")
           }
+        // Start session
+        case req @ PUT -> Root / SessionRoute / FormSessionIdVar(id) / "start" as companyUser =>
+          val action = formSessionService.start(id, companyUser.id)
+          action.value.flatMap {
+            case Right(saved) => Ok(saved)
+            case Left(err) => BadRequest(s"Error '$err' while starting form session.")
+          }
+        // Finish session
+        case req @ PUT -> Root / SessionRoute / FormSessionIdVar(id) / "finish" as companyUser =>
+          val action = formSessionService.finish(id, companyUser.id)
+          action.value.flatMap {
+            case Right(saved) => Ok(saved)
+            case Left(err) => BadRequest(s"Error '$err' while finishing form session.")
+          }
         // get session by id
         case GET -> Root / SessionRoute / FormSessionIdVar(id) as companyUser =>
           val action = formSessionService.getById(id, companyUser.id)

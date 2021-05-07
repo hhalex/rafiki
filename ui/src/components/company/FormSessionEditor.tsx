@@ -6,6 +6,9 @@ import { Formik, Form as FormikForm, Field as FormikField, getIn, FieldArray } f
 import { ArrowRightAltOutlined, Clear } from '@material-ui/icons';
 import AddIcon from '@material-ui/icons/Add';
 import EditIcon from '@material-ui/icons/Edit';
+import PlayArrowIcon from '@material-ui/icons/PlayArrow';
+import StopIcon from '@material-ui/icons/Stop';
+import DoneIcon from '@material-ui/icons/Done';
 import { Link, Route, Switch, useHistory, useParams, useRouteMatch } from "react-router-dom";
 import { Form } from "../../api/company/form";
 import { FormSessionInvite } from "../../api/company/invite";
@@ -55,25 +58,39 @@ const FormOverview = ({ apiSession }: { apiSession: ReturnType<typeof FormSessio
 
   useEffect(listEntries as any, []);
 
-  const enum SessionLabel {
+  const enum SessionState {
     PENDING = "PENDING",
     STARTED = "STARTED",
     FINISHED = "FINISHED"
   }
 
-  const sessionLabel = ({ startDate, endDate }: FormSession.Full) =>
+  const sessionState = ({ startDate, endDate }: FormSession.Full) =>
     (!startDate && !endDate)
-      ? SessionLabel.PENDING
+      ? SessionState.PENDING
       : (startDate && !endDate)
-        ? SessionLabel.STARTED
-        : SessionLabel.FINISHED;
+        ? SessionState.STARTED
+        : SessionState.FINISHED;
 
   return <List className={classes.table}>
-    {list.flatMap(formSession => ([
+    {list.flatMap(formSession => {
+      const sState = sessionState(formSession);
+      return [
       <Divider key={`divider-${formSession.id}`} />,
       <ListItem key={formSession.id}>
-        <ListItemText primary={formSession.name} secondary={sessionLabel(formSession)} />
+        <ListItemText primary={formSession.name} secondary={sState} />
         <ListItemSecondaryAction>
+          {(sState == SessionState.PENDING)
+            ? <IconButton onClick={() => apiSession.start(formSession.id).then(listEntries)}>
+                <PlayArrowIcon />
+              </IconButton>
+            : (sState == SessionState.STARTED)
+              ? <IconButton onClick={() => apiSession.finish(formSession.id).then(listEntries)}>
+                  <StopIcon />
+                </IconButton>
+              : <IconButton disabled>
+                  <DoneIcon />
+                </IconButton>
+          }
           <IconButton component={Link} to={`${url}/${formSession.id}`}>
             <EditIcon />
           </IconButton>
@@ -81,8 +98,7 @@ const FormOverview = ({ apiSession }: { apiSession: ReturnType<typeof FormSessio
             <Clear />
           </IconButton>
         </ListItemSecondaryAction>
-      </ListItem>]
-    )).slice(1)}
+      </ListItem>]}).slice(1)}
     <ListItem key="new">
       <Button
         onClick={() => { }}

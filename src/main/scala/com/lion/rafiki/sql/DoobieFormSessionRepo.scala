@@ -12,14 +12,15 @@ import doobie.{Fragments, LogHandler, Transactor}
 import doobie.implicits.toSqlInterpolator
 import doobie.util.meta.Meta
 
-import java.time.LocalDateTime
-
+import org.joda.time.DateTime
+import java.sql.Timestamp
 private[sql] object FormSessionSQL {
   import CompanyContractSQL._
   import CompanySQL._
   import FormSQL._
   implicit val formSessionIdReader: Meta[FormSession.Id] = createMetaId(FormSession)
   implicit val han: LogHandler = LogHandler.jdkLogHandler
+  implicit val jodaTime: Meta[DateTime] = Meta[Timestamp].timap(ts => new DateTime(ts.getTime()))(t => new Timestamp(t.getMillis()))
 
   def byIdQ(id: FormSession.Id) =
     sql"""SELECT id, form_id, name, start_date, end_date FROM form_sessions WHERE id=$id"""
@@ -29,8 +30,8 @@ private[sql] object FormSessionSQL {
       companyContractId: CompanyContract.Id,
       formId: Form.Id,
       name: String,
-      startDate: Option[LocalDateTime],
-      endDate: Option[LocalDateTime]
+      startDate: Option[DateTime],
+      endDate: Option[DateTime]
   ) =
     sql"""INSERT INTO form_sessions (company_contract_id, form_id, name, start_date, end_date) VALUES ($companyContractId, $formId, $name, $startDate, $endDate)""".update
 
@@ -38,8 +39,8 @@ private[sql] object FormSessionSQL {
       id: FormSession.Id,
       formId: Form.Id,
       name: String,
-      startDate: Option[LocalDateTime],
-      endDate: Option[LocalDateTime]
+      startDate: Option[DateTime],
+      endDate: Option[DateTime]
   ) = {
     sql"UPDATE form_sessions SET form_id=$formId, name=$name, start_date=$startDate, end_date=$endDate WHERE id=$id".update
   }

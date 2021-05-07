@@ -36,6 +36,7 @@ import org.http4s.server.blaze.BlazeServerBuilder
 import org.http4s.server.middleware.Logger
 
 import java.time.Clock
+import com.github.nscala_time.time.Imports.DateTime
 import scala.concurrent.ExecutionContext.global
 
 object Main extends IOApp {
@@ -80,7 +81,7 @@ object Main extends IOApp {
         )
 
         val formSessionService =
-          new FormSession.Service[IO](formSessionRepo, formSessionValidation)
+          new FormSession.Service[IO](formSessionRepo, formSessionValidation, DateTime.now)
         val formSessionInviteRepo = new DoobieFormSessionInviteRepo[IO](xa)
         val formSessionInviteValidation =
           new FormSessionInvite.FromRepoValidation[IO](

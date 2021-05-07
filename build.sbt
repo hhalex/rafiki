@@ -15,6 +15,7 @@ lazy val root = (project in file("."))
     scalaVersion := "3.0.0-RC2",
     crossScalaVersions ++= Seq("2.13.5", "3.0.0-RC2"),
     libraryDependencies ++= Seq(
+      ("com.github.nscala-time" %% "nscala-time" % "2.26.0").cross(CrossVersion.for3Use2_13),
       "org.http4s"          %% "http4s-blaze-server" % Http4sVersion,
       "org.http4s"          %% "http4s-blaze-client" % Http4sVersion,
       "org.http4s"          %% "http4s-circe"        % Http4sVersion,

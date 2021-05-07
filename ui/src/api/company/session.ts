@@ -18,10 +18,14 @@ export namespace FormSession {
     export const createApi = (authFetch: AuthenticatedFetch) => ({
         create: (formSession: Create, formId: string): Promise<Full> =>
             authFetch.post(`/api/company/form/${formId}/session`, JSON.stringify(formSession)).then<Full>(b => b.json()),
+        start: (formSessionId: string) =>
+            authFetch.put(`/api/company/session/${formSessionId}/start`).then<Full>(b => b.json()),
+        finish: (formSessionId: string) =>
+            authFetch.put(`/api/company/session/${formSessionId}/finish`).then<Full>(b => b.json()),
         update: (formSession: Update) =>
             authFetch.put(`/api/company/session/${formSession.id}`, JSON.stringify(formSession)).then<Full>(b => b.json()),
         delete: (formSessionId: string) => authFetch.delete(`/api/company/session/${formSessionId}`).then(_ => {}),
-        list: (pageSize?: number, offset?: number) => 
+        list: (pageSize?: number, offset?: number) =>
             authFetch.get(`/api/company/session`).then<Full[]>(b => b.json()),
         getById: (formId: string) => authFetch.get(`/api/company/session/${formId}`).then<Full>(b => b.json()),
     });

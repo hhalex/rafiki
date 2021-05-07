@@ -2,6 +2,7 @@ package com.lion.rafiki.domain
 
 import com.lion.rafiki.auth.{AuthError, PasswordError}
 import org.http4s.DecodeFailure
+import com.lion.rafiki.domain.company.FormSession
 
 sealed trait ValidationError extends Product with Serializable
 
@@ -17,6 +18,11 @@ object ValidationError {
   case object NotAllowed extends ValidationError
 
   case object CompanyContractFull extends ValidationError
+
+  // form sessions
+  case object FormSessionBrokenState extends ValidationError
+  case class FormSessionCantStart(state: FormSession.State) extends ValidationError
+  case class FormSessionCantFinish(state: FormSession.State) extends ValidationError
 
   case class Repo(e: RepoError) extends ValidationError
   case class Decoding(e: DecodeFailure) extends ValidationError

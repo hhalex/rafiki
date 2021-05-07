@@ -14,16 +14,29 @@ import com.lion.rafiki.domain.{
 }
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.{Decoder, Encoder}
+import io.circe.syntax._
+import org.joda.time.DateTime
 
-import java.time.LocalDateTime
+import org.joda.time.format.ISODateTimeFormat
+import scala.util.control.NonFatal
 
 case class FormSession(
     formId: Form.Id,
     name: String,
-    startDate: Option[LocalDateTime],
-    endDate: Option[LocalDateTime]
+    startDate: Option[DateTime],
+    endDate: Option[DateTime]
 ) {
-  def withId(id: FormSession.Id) = WithId(id, this)
+  import FormSession._
+  def withId(id: Id) = WithId(id, this)
+  val state: Either[String, State] =
+    if startDate.isEmpty && endDate.isEmpty then
+      Right(State.Pending)
+    else if startDate.isDefined && endDate.isEmpty then
+      Right(State.Started)
+    else if startDate.isDefined && endDate.isDefined then
+      Right(State.Finished)
+    else
+      Left("Broken state")
 }
 
 private trait SessionId
@@ -34,8 +47,22 @@ object FormSession extends TaggedId[SessionId] {
   type Record = Update
   type Full = Update
 
+  enum State {
+    case Pending, Started, Finished
+  }
 
   import Form.{taggedIdDecoder, taggedIdEncoder}
+  val dateFormatter = ISODateTimeFormat.basicDateTime()
+  implicit val decodeDateTime: Decoder[DateTime] = Decoder.decodeString.emap { s =>
+    try {
+      Right(dateFormatter.parseDateTime(s))
+    } catch {
+      case NonFatal(e) => Left(e.getMessage)
+    }
+  }
+  implicit val encodeDateTime: Encoder[DateTime] = Encoder.instance { s =>
+    dateFormatter.print(s).asJson
+  }
   implicit val formSessionCreateDecoder: Decoder[Create] = deriveDecoder
   implicit val formSessionCreateEncoder: Encoder[Create] = deriveEncoder
   implicit val formSessionUpdateDecoder: Decoder[Update] = WithId.decoder
@@ -109,7 +136,7 @@ object FormSession extends TaggedId[SessionId] {
           case Nil => contractFull
           case hd :: tail =>
             tail.foldLeft(checkContractIdValid(hd))((prec, record) =>
-              prec.flatMap(_ => checkContractIdValid(record))
+              prec.orElse(checkContractIdValid(record))
             )
         }
       yield validContract
@@ -121,7 +148,7 @@ object FormSession extends TaggedId[SessionId] {
     yield formSession
   }
 
-  class Service[F[_]: Monad](repo: Repo[F], validation: Validation[F]) {
+  class Service[F[_]: Monad](repo: Repo[F], validation: Validation[F], now: () => DateTime) {
     type Result[T] = EitherT[F, ValidationError, T]
 
     def create(
@@ -154,6 +181,28 @@ object FormSession extends TaggedId[SessionId] {
       _ <- validation.hasOwnership(formSession.id, companyId)
       result <- repo
         .update(formSession)
+        .leftMap[ValidationError](ValidationError.Repo)
+    yield result
+
+    def start(formSessionId: FormSession.Id, companyId: Company.Id): Result[Full] = for
+      formSession <- validation.hasOwnership(formSessionId, companyId)
+      state <- EitherT.fromEither(formSession.data.state).leftMap[ValidationError](_ => ValidationError.FormSessionBrokenState)
+      _ <- state match
+        case State.Pending => EitherT.rightT(())
+        case other => EitherT.leftT[F, ValidationError](ValidationError.FormSessionCantStart(other))
+      result <- repo
+        .update(formSession.mapData(_.copy(startDate = now().some)))
+        .leftMap[ValidationError](ValidationError.Repo)
+    yield result
+
+    def finish(formSessionId: FormSession.Id, companyId: Company.Id): Result[Full] = for
+      formSession <- validation.hasOwnership(formSessionId, companyId)
+      state <- EitherT.fromEither(formSession.data.state).leftMap[ValidationError](_ => ValidationError.FormSessionBrokenState)
+      _ <- state match
+        case State.Started => EitherT.rightT(())
+        case other => EitherT.leftT[F, ValidationError](ValidationError.FormSessionCantFinish(other))
+      result <- repo
+        .update(formSession.mapData(_.copy(endDate = now().some)))
         .leftMap[ValidationError](ValidationError.Repo)
     yield result
 
