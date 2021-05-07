@@ -1,10 +1,11 @@
-import { Button, ButtonGroup, Divider, Fab, FormControl, IconButton, InputLabel, List, ListItem, ListItemIcon, ListItemSecondaryAction, ListItemText, makeStyles, MenuItem, Select, TextField } from "@material-ui/core";
+import { Button, Divider, FormControl, IconButton, InputLabel, List, ListItem, ListItemIcon, ListItemSecondaryAction, ListItemText, makeStyles, MenuItem, Select, TextField } from "@material-ui/core";
 import React, { useEffect } from "react";
 import { FormSession } from "../../api/company/session";
 import * as Yup from "yup";
 import { Formik, Form as FormikForm, Field as FormikField, getIn, FieldArray } from "formik";
 import { ArrowRightAltOutlined, Clear } from '@material-ui/icons';
 import AddIcon from '@material-ui/icons/Add';
+import EditIcon from '@material-ui/icons/Edit';
 import { Link, Route, Switch, useHistory, useParams, useRouteMatch } from "react-router-dom";
 import { Form } from "../../api/company/form";
 import { FormSessionInvite } from "../../api/company/invite";
@@ -70,9 +71,12 @@ const FormOverview = ({ apiSession }: { apiSession: ReturnType<typeof FormSessio
   return <List className={classes.table}>
     {list.flatMap(formSession => ([
       <Divider key={`divider-${formSession.id}`} />,
-      <ListItem key={formSession.id} button component={Link} to={`${url}/${formSession.id}`}>
+      <ListItem key={formSession.id}>
         <ListItemText primary={formSession.name} secondary={sessionLabel(formSession)} />
         <ListItemSecondaryAction>
+          <IconButton component={Link} to={`${url}/${formSession.id}`}>
+            <EditIcon />
+          </IconButton>
           <IconButton onClick={() => deleteEntry(formSession.id)}>
             <Clear />
           </IconButton>
