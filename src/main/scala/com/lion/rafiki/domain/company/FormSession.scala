@@ -94,19 +94,26 @@ object FormSession extends TaggedId[SessionId] {
   }
 
   trait Validation[F[_]] {
+    type Result[T] = EitherT[F, ValidationError, T]
     def canCreateSession(
         formId: Form.Id,
         companyId: Company.Id
-    ): EitherT[F, ValidationError, CompanyContract.Record]
+    ): Result[CompanyContract.Record]
+    def checkTeamMembers(
+        formSession: Full
+    ): Result[(Full, List[FormSessionInvite.RecordWithEmail])]
+    def stateAllowStart(state: Full): Result[Unit]
+    def stateAllowFinish(state: Full): Result[Unit]
     def hasOwnership(
         id: FormSession.Id,
         companyId: Company.Id
-    ): EitherT[F, ValidationError, Full]
+    ): Result[Full]
   }
 
   class FromRepoValidation[F[_]: Monad](
       repo: Repo[F],
       formValidation: Form.Validation[F],
+      sessionInviteRepo: FormSessionInvite.Repo[F],
       companyContractRepo: CompanyContract.Repo[F]
   ) extends Validation[F] {
     val success = EitherT.rightT[F, ValidationError](())
@@ -142,10 +149,53 @@ object FormSession extends TaggedId[SessionId] {
       yield validContract
     }
 
-    override def hasOwnership(id: Id, companyId: Company.Id) = for
-      formSession <- repo.get(id).leftMap(ValidationError.Repo)
-      _ <- formValidation.hasOwnership(formSession.data.formId, companyId.some)
-    yield formSession
+    def countTeamMembers(teams: List[String]) = teams
+      .foldLeft(Map[String, Int]()) { (counts, currentPath) =>
+        currentPath.split("/").filter(_.nonEmpty)
+        // Generates intermediate paths (for /1/2/3 generates /1, /1/2, /1/2/3)
+        .foldRight(List[String]()) { (currentChunk, paths) =>
+          currentChunk :: paths.map(p => s"$currentChunk/$p")
+        }
+        // Updates the "counts" map
+        .foldLeft(counts) { (currentCounts, path) =>
+          currentCounts + (path -> (currentCounts.getOrElse(path, 0) + 1))
+        }
+      }
+
+    override def checkTeamMembers(formSession: Full) =
+      for
+        invites <- sessionInviteRepo
+          .getByFormSession(formSession.id)
+          .leftMap[ValidationError](ValidationError.Repo)
+        _ <- countTeamMembers(invites.map(_.data.team))
+          .filter(_._2 < 10)
+          .keySet
+          .toList match
+            case Nil => EitherT.rightT(())
+            case teams => EitherT.leftT(ValidationError.FormSessionTooFewTeamMembers(teams))
+      yield (formSession, invites)
+
+    override def stateAllowStart(formSession: Full) =
+      for
+        state <- EitherT.fromEither(formSession.data.state).leftMap[ValidationError](_ => ValidationError.FormSessionBrokenState)
+        _ <- state match
+          case State.Pending => EitherT.rightT(())
+          case other => EitherT.leftT[F, ValidationError](ValidationError.FormSessionCantStart(other))
+      yield ()
+
+    override def stateAllowFinish(formSession: Full) =
+      for
+        state <- EitherT.fromEither(formSession.data.state).leftMap[ValidationError](_ => ValidationError.FormSessionBrokenState)
+        _ <- state match
+          case State.Started => EitherT.rightT(())
+          case other => EitherT.leftT[F, ValidationError](ValidationError.FormSessionCantFinish(other))
+      yield ()
+
+    override def hasOwnership(id: Id, companyId: Company.Id) =
+      for
+        formSession <- repo.get(id).leftMap(ValidationError.Repo)
+        _ <- formValidation.hasOwnership(formSession.data.formId, companyId.some)
+      yield formSession
   }
 
   class Service[F[_]: Monad](repo: Repo[F], validation: Validation[F], now: () => DateTime) {
@@ -186,10 +236,8 @@ object FormSession extends TaggedId[SessionId] {
 
     def start(formSessionId: FormSession.Id, companyId: Company.Id): Result[Full] = for
       formSession <- validation.hasOwnership(formSessionId, companyId)
-      state <- EitherT.fromEither(formSession.data.state).leftMap[ValidationError](_ => ValidationError.FormSessionBrokenState)
-      _ <- state match
-        case State.Pending => EitherT.rightT(())
-        case other => EitherT.leftT[F, ValidationError](ValidationError.FormSessionCantStart(other))
+      _ <- validation.stateAllowStart(formSession)
+      _ <- validation.checkTeamMembers(formSession)
       result <- repo
         .update(formSession.mapData(_.copy(startDate = now().some)))
         .leftMap[ValidationError](ValidationError.Repo)
@@ -197,10 +245,7 @@ object FormSession extends TaggedId[SessionId] {
 
     def finish(formSessionId: FormSession.Id, companyId: Company.Id): Result[Full] = for
       formSession <- validation.hasOwnership(formSessionId, companyId)
-      state <- EitherT.fromEither(formSession.data.state).leftMap[ValidationError](_ => ValidationError.FormSessionBrokenState)
-      _ <- state match
-        case State.Started => EitherT.rightT(())
-        case other => EitherT.leftT[F, ValidationError](ValidationError.FormSessionCantFinish(other))
+      _ <- validation.stateAllowFinish(formSession)
       result <- repo
         .update(formSession.mapData(_.copy(endDate = now().some)))
         .leftMap[ValidationError](ValidationError.Repo)

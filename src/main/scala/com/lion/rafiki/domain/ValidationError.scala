@@ -23,6 +23,7 @@ object ValidationError {
   case object FormSessionBrokenState extends ValidationError
   case class FormSessionCantStart(state: FormSession.State) extends ValidationError
   case class FormSessionCantFinish(state: FormSession.State) extends ValidationError
+  case class FormSessionTooFewTeamMembers(teams: List[String]) extends ValidationError
 
   case class Repo(e: RepoError) extends ValidationError
   case class Decoding(e: DecodeFailure) extends ValidationError

@@ -74,20 +74,23 @@ object Main extends IOApp {
         val formService = new Form.Service[IO](formRepo, inviteAnswerRepo, formValidation)
 
         val formSessionRepo = new DoobieFormSessionRepo[IO](xa)
+        val formSessionInviteRepo = new DoobieFormSessionInviteRepo[IO](xa)
+
         val formSessionValidation = new FormSession.FromRepoValidation[IO](
           formSessionRepo,
           formValidation,
+          formSessionInviteRepo,
           companyContractRepo
+        )
+
+        val formSessionInviteValidation = new FormSessionInvite.FromRepoValidation[IO](
+          formSessionInviteRepo,
+          formSessionValidation
         )
 
         val formSessionService =
           new FormSession.Service[IO](formSessionRepo, formSessionValidation, DateTime.now)
-        val formSessionInviteRepo = new DoobieFormSessionInviteRepo[IO](xa)
-        val formSessionInviteValidation =
-          new FormSessionInvite.FromRepoValidation[IO](
-            formSessionInviteRepo,
-            formSessionValidation
-          )
+
         val formSessionInviteService = new FormSessionInvite.Service[IO](
           formSessionInviteRepo,
           formSessionInviteValidation,
