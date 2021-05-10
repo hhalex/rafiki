@@ -28,15 +28,11 @@ case class FormSession(
 ) {
   import FormSession._
   def withId(id: Id) = WithId(id, this)
-  val state: Either[String, State] =
-    if startDate.isEmpty && endDate.isEmpty then
-      Right(State.Pending)
-    else if startDate.isDefined && endDate.isEmpty then
-      Right(State.Started)
-    else if startDate.isDefined && endDate.isDefined then
-      Right(State.Finished)
-    else
-      Left("Broken state")
+  val state: Either[String, State] = (startDate, endDate) match
+    case (None, None) => Right(State.Pending)
+    case (Some(_), None) => Right(State.Started)
+    case (Some(_), Some(_)) => Right(State.Finished)
+    case _ => Left("Broken state")
 }
 
 private trait SessionId
