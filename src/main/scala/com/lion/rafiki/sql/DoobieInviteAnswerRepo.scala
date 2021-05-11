@@ -8,12 +8,12 @@ import cats.effect.MonadCancel
 import cats.implicits.{catsSyntaxOptionId, toFunctorOps}
 import com.lion.rafiki.auth.PasswordHasher
 import com.lion.rafiki.domain.{RepoError, User}
-import com.lion.rafiki.domain.company.{Form, InviteAnswer, FormSessionInvite}
+import com.lion.rafiki.domain.company.{Form, InviteAnswer, SessionInvite}
 import com.lion.rafiki.sql.SQLPagination.paginate
 import doobie.util.meta.Meta
 
 private[sql] object InviteAnswerSQL {
-  import FormSessionInviteSQL._
+  import SessionInviteSQL._
 
   def createOrUpdateAnswerTable(
       name: InviteAnswer.TableName,

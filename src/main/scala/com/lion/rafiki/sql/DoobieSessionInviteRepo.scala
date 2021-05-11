@@ -3,7 +3,7 @@ package com.lion.rafiki.sql
 import cats.effect.MonadCancel
 import doobie.implicits._
 import cats.implicits.toFunctorOps
-import com.lion.rafiki.domain.company.{FormSession, FormSessionInvite}
+import com.lion.rafiki.domain.company.{FormSession, SessionInvite}
 import com.lion.rafiki.domain.User
 import com.lion.rafiki.sql.SQLPagination.paginate
 import doobie.Transactor
@@ -11,20 +11,20 @@ import doobie.implicits.toSqlInterpolator
 import doobie.util.Read
 import doobie.util.meta.Meta
 
-private[sql] object FormSessionInviteSQL {
+private[sql] object SessionInviteSQL {
   import FormSessionSQL._
   import UserSQL._
-  implicit val formSessionInviteIdReader: Meta[FormSessionInvite.Id] =
-    createMetaId(FormSessionInvite)
-  implicit val formSessionInviteFullReader: Read[FormSessionInvite.Full] =
-    Read[(FormSessionInvite.Record, User.Record)].map({ case (invite, user) =>
+  implicit val SessionInviteIdReader: Meta[SessionInvite.Id] =
+    createMetaId(SessionInvite)
+  implicit val SessionInviteFullReader: Read[SessionInvite.Full] =
+    Read[(SessionInvite.Record, User.Record)].map({ case (invite, user) =>
       invite.mapData(_.copy(user = user))
     })
   val listFullInvitesFragment =
     fr"""SELECT fsi.form_session_id, fsi.id, u.email, fsi.team, fsi.accept_conditions FROM form_session_invites fsi LEFT JOIN users u ON fsi.user_id = u.id"""
-  def byIdQ(id: FormSessionInvite.Id) =
+  def byIdQ(id: SessionInvite.Id) =
     (listFullInvitesFragment ++ fr"""WHERE fsi.id=$id""")
-      .query[(FormSession.Id, FormSessionInvite.RecordWithEmail)]
+      .query[(FormSession.Id, SessionInvite.RecordWithEmail)]
 
   def insertQ(
       formSessionId: FormSession.Id,
@@ -35,7 +35,7 @@ private[sql] object FormSessionInviteSQL {
     sql"""INSERT INTO form_session_invites (form_session_id, user_id, team, accept_conditions) VALUES ($formSessionId, $userId, $team, $acceptConditions)""".update
 
   def updateQ(
-      id: FormSessionInvite.Id,
+      id: SessionInvite.Id,
       userId: User.Id,
       team: String,
       acceptConditions: Option[Boolean]
@@ -43,12 +43,12 @@ private[sql] object FormSessionInviteSQL {
     sql"UPDATE form_session_invites SET user_id=$userId, team=$team, accept_conditions=$acceptConditions WHERE id=$id".update
   }
 
-  def deleteQ(id: FormSessionInvite.Id) =
+  def deleteQ(id: SessionInvite.Id) =
     sql"""DELETE FROM form_session_invites WHERE id=$id""".update
 
   def byFormSessionQ(formSessionId: FormSession.Id) =
     (listFullInvitesFragment ++ fr"""WHERE form_session_id = $formSessionId""")
-      .query[(FormSession.Id, FormSessionInvite.RecordWithEmail)]
+      .query[(FormSession.Id, SessionInvite.RecordWithEmail)]
 
   def listBySessionQ(
       formSessionId: FormSession.Id,
@@ -60,57 +60,57 @@ private[sql] object FormSessionInviteSQL {
   def listAllQ(pageSize: Int, offset: Int) =
     paginate(pageSize, offset)(
       listFullInvitesFragment
-        .query[(FormSession.Id, FormSessionInvite.RecordWithEmail)]
+        .query[(FormSession.Id, SessionInvite.RecordWithEmail)]
     )
 }
 
-class DoobieFormSessionInviteRepo[F[_]: TaglessMonadCancel](
+class DoobieSessionInviteRepo[F[_]: TaglessMonadCancel](
     val xa: Transactor[F]
-) extends FormSessionInvite.Repo[F] {
-  import FormSessionInviteSQL._
+) extends SessionInvite.Repo[F] {
+  import SessionInviteSQL._
   import com.lion.rafiki.domain.RepoError._
 
   override def create(
-      formSessionInvite: FormSessionInvite[User.Id],
+      sessionInvite: SessionInvite[User.Id],
       formSessionId: FormSession.Id
-  ): Result[FormSessionInvite.Record] =
+  ): Result[SessionInvite.Record] =
     insertQ(
       formSessionId,
-      formSessionInvite.user,
-      formSessionInvite.team,
-      formSessionInvite.acceptConditions
+      sessionInvite.user,
+      sessionInvite.team,
+      sessionInvite.acceptConditions
     )
-      .withUniqueGeneratedKeys[FormSessionInvite.Id]("id")
-      .map(formSessionInvite.withId _)
+      .withUniqueGeneratedKeys[SessionInvite.Id]("id")
+      .map(sessionInvite.withId _)
       .toResult()
       .transact(xa)
 
   override def update(
-      formSessionInvite: FormSessionInvite.UpdateRecord
-  ): Result[FormSessionInvite.Record] = {
-    val invite = formSessionInvite.data
+      sessionInvite: SessionInvite.UpdateRecord
+  ): Result[SessionInvite.Record] = {
+    val invite = sessionInvite.data
     updateQ(
-      formSessionInvite.id,
+      sessionInvite.id,
       invite.user,
       invite.team,
       invite.acceptConditions
     ).run
-      .as(formSessionInvite)
+      .as(sessionInvite)
       .toResult()
       .transact(xa)
   }
 
   override def get(
-      id: FormSessionInvite.Id
-  ): Result[(FormSession.Id, FormSessionInvite.RecordWithEmail)] =
+      id: SessionInvite.Id
+  ): Result[(FormSession.Id, SessionInvite.RecordWithEmail)] =
     byIdQ(id).option.toResult().transact(xa)
 
   override def getByFormSession(
       id: FormSession.Id
-  ): Result[List[FormSessionInvite.RecordWithEmail]] =
+  ): Result[List[SessionInvite.RecordWithEmail]] =
     byFormSessionQ(id).map(_._2).to[List].toResult().transact(xa)
 
-  override def delete(id: FormSessionInvite.Id): Result[Unit] = byIdQ(id).option
+  override def delete(id: SessionInvite.Id): Result[Unit] = byIdQ(id).option
     .flatMap(_ => deleteQ(id).run.as(()))
     .toResult()
     .transact(xa)
@@ -118,7 +118,7 @@ class DoobieFormSessionInviteRepo[F[_]: TaglessMonadCancel](
   override def list(
       pageSize: Int,
       offset: Int
-  ): Result[List[(FormSession.Id, FormSessionInvite.RecordWithEmail)]] =
+  ): Result[List[(FormSession.Id, SessionInvite.RecordWithEmail)]] =
     listAllQ(pageSize: Int, offset: Int).to[List].toResult().transact(xa)
 
   override def listByFormSession(

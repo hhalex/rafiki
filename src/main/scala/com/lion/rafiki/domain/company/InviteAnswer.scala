@@ -10,15 +10,15 @@ type Label = String
 case class AnswerValue(numeric: Option[Int], freetext: Option[String])
 
 case class InviteAnswer(values: Map[Label, AnswerValue]) {
-  def withId(id: FormSessionInvite.Id) = WithId(id, this)
+  def withId(id: SessionInvite.Id) = WithId(id, this)
 }
 
 object InviteAnswer {
-  import FormSessionInvite.{taggedIdDecoder, taggedIdEncoder}
+  import SessionInvite.{taggedIdDecoder, taggedIdEncoder}
   opaque type TableName <: String = String
 
   type Create = InviteAnswer
-  type Update = WithId[FormSessionInvite.Id, Create]
+  type Update = WithId[SessionInvite.Id, Create]
   type Record = Update
   type Full = Update
 

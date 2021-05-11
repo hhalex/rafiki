@@ -9,7 +9,7 @@ import com.lion.rafiki.auth.{
   PrivateKey,
   UserAuth
 }
-import com.lion.rafiki.domain.company.{Form, FormSession, FormSessionInvite}
+import com.lion.rafiki.domain.company.{Form, FormSession, SessionInvite}
 import com.lion.rafiki.domain.{Company, CompanyContract, User}
 import com.lion.rafiki.endpoints.{
   AuthenticationEndpoints,
@@ -21,7 +21,7 @@ import com.lion.rafiki.sql.{
   DoobieCompanyContractRepo,
   DoobieCompanyRepo,
   DoobieFormRepo,
-  DoobieFormSessionInviteRepo,
+  DoobieSessionInviteRepo,
   DoobieInviteAnswerRepo,
   DoobieFormSessionRepo,
   DoobieUserRepo,
@@ -74,7 +74,7 @@ object Main extends IOApp {
         val formService = new Form.Service[IO](formRepo, inviteAnswerRepo, formValidation)
 
         val formSessionRepo = new DoobieFormSessionRepo[IO](xa)
-        val formSessionInviteRepo = new DoobieFormSessionInviteRepo[IO](xa)
+        val formSessionInviteRepo = new DoobieSessionInviteRepo[IO](xa)
 
         val formSessionValidation = new FormSession.FromRepoValidation[IO](
           formSessionRepo,
@@ -83,7 +83,7 @@ object Main extends IOApp {
           companyContractRepo
         )
 
-        val formSessionInviteValidation = new FormSessionInvite.FromRepoValidation[IO](
+        val formSessionInviteValidation = new SessionInvite.FromRepoValidation[IO](
           formSessionInviteRepo,
           formSessionValidation
         )
@@ -91,7 +91,7 @@ object Main extends IOApp {
         val formSessionService =
           new FormSession.Service[IO](formSessionRepo, formSessionValidation, DateTime.now)
 
-        val formSessionInviteService = new FormSessionInvite.Service[IO](
+        val formSessionInviteService = new SessionInvite.Service[IO](
           formSessionInviteRepo,
           formSessionInviteValidation,
           formSessionValidation,

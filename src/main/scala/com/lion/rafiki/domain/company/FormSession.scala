@@ -97,7 +97,7 @@ object FormSession extends TaggedId[SessionId] {
     ): Result[CompanyContract.Record]
     def checkTeamMembers(
         formSession: Full
-    ): Result[(Full, List[FormSessionInvite.RecordWithEmail])]
+    ): Result[(Full, List[SessionInvite.RecordWithEmail])]
     def stateAllowStart(state: Full): Result[Unit]
     def stateAllowFinish(state: Full): Result[Unit]
     def hasOwnership(
@@ -109,7 +109,7 @@ object FormSession extends TaggedId[SessionId] {
   class FromRepoValidation[F[_]: Monad](
       repo: Repo[F],
       formValidation: Form.Validation[F],
-      sessionInviteRepo: FormSessionInvite.Repo[F],
+      sessionInviteRepo: SessionInvite.Repo[F],
       companyContractRepo: CompanyContract.Repo[F]
   ) extends Validation[F] {
     val success = EitherT.rightT[F, ValidationError](())

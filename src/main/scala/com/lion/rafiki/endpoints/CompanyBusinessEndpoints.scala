@@ -3,7 +3,7 @@ package com.lion.rafiki.endpoints
 import cats.effect.{Async, Sync}
 import cats.syntax.all._
 import com.lion.rafiki.auth.UserAuth
-import com.lion.rafiki.domain.company.{Form, FormSession, FormSessionInvite}
+import com.lion.rafiki.domain.company.{Form, FormSession, SessionInvite}
 import com.lion.rafiki.domain.{Company, ValidationError}
 import org.http4s.{AuthedRoutes, HttpRoutes}
 import org.http4s.circe._
@@ -19,11 +19,11 @@ class CompanyBusinessEndpoints[F[_]: Async] extends Http4sDsl[F] {
   val InviteRoute = "invite"
   object FormIdVar extends IdVar[Form.Id](Form.tag)
   object FormSessionIdVar extends IdVar[FormSession.Id](FormSession.tag)
-  object FormSessionInviteIdVar extends IdVar[FormSessionInvite.Id](FormSessionInvite.tag)
+  object FormSessionInviteIdVar extends IdVar[SessionInvite.Id](SessionInvite.tag)
 
   def endpoints(formService: Form.Service[F],
                 formSessionService: FormSession.Service[F],
-                formSessionInviteService: FormSessionInvite.Service[F],
+                formSessionInviteService: SessionInvite.Service[F],
                 userAuth: UserAuth[F]): HttpRoutes[F] = userAuth.authCompany {
       AuthedRoutes.of[Company.Record, F] {
         // Create form
@@ -136,7 +136,7 @@ class CompanyBusinessEndpoints[F[_]: Async] extends Http4sDsl[F] {
         // create invite on a session
         case req @ POST -> Root / SessionRoute / FormSessionIdVar(formSessionId) / InviteRoute as companyUser =>
           val action = for
-            formSessionInvite <- req.req.attemptAs[FormSessionInvite[String]].leftMap(ValidationError.Decoding)
+            formSessionInvite <- req.req.attemptAs[SessionInvite[String]].leftMap(ValidationError.Decoding)
             result <- formSessionInviteService.create(formSessionInvite, formSessionId, companyUser.id)
           yield result
 
@@ -158,7 +158,7 @@ class CompanyBusinessEndpoints[F[_]: Async] extends Http4sDsl[F] {
         // update invite
         case req @ PUT -> Root / InviteRoute / FormSessionInviteIdVar(inviteId) as companyUser =>
           val action = for
-            invite <- req.req.attemptAs[FormSessionInvite[String]].leftMap(ValidationError.Decoding)
+            invite <- req.req.attemptAs[SessionInvite[String]].leftMap(ValidationError.Decoding)
             result <- formSessionInviteService.update(invite.withId(inviteId), companyUser.id)
           yield result
 
