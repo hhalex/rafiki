@@ -119,8 +119,9 @@ object FormSession extends TaggedId[SessionId] {
     override def canCreateSession(formId: Form.Id, companyId: Company.Id) = {
       val checkContractIdValid = (contract: CompanyContract.Record) =>
         contract.data.kind match {
-          case Kind.Unlimited => EitherT.rightT[F, ValidationError](contract)
-          case Kind.OneShot =>
+          case Kind.UnlimitedOpen => EitherT.rightT[F, ValidationError](contract)
+          case Kind.UnlimitedClosed => contractFull
+          case Kind.Oneshot =>
             repo
               .getByCompanyContract(contract.id)
               .leftMap[ValidationError](ValidationError.Repo)

@@ -2,6 +2,7 @@ package com.lion.rafiki.domain
 
 import cats.Monad
 import cats.data.EitherT
+import cats.syntax.all._
 import cats.implicits.{toBifunctorOps, toFunctorOps}
 import com.lion.rafiki.domain
 import io.circe.{Decoder, Encoder}
@@ -17,34 +18,20 @@ final case class CompanyContract[Company](
 trait ContractId
 object CompanyContract extends TaggedId[ContractId] {
   import Company.{taggedIdDecoder, taggedIdEncoder}
-  sealed trait Kind extends Product with Serializable {
-    override def toString: String = this match {
-      case Kind.Unlimited  => "unlimited"
-      case Kind.OneShot    => "oneshot"
-      case Kind.Unknown(s) => s"Unknown contract: '$s'"
-    }
-  }
-  object Kind {
-    case object OneShot extends Kind
-    case object Unlimited extends Kind
-    case class Unknown(kind: String) extends Kind
 
-    implicit val companyContractKindDecoder: Decoder[Kind] =
-      Decoder[String].emap(Kind.fromStringE)
-    implicit val companyContractKindEncoder: Encoder[Kind] =
-      Encoder[String].contramap(_.toString)
+  enum Kind(val str: String):
+    case Oneshot extends Kind("oneshot")
+    case UnlimitedOpen extends Kind("unlimited_open")
+    case UnlimitedClosed extends Kind("unlimited_closed")
 
-    def fromString(s: String) = s.toLowerCase match {
-      case "unlimited" => Kind.Unlimited
-      case "oneshot"   => Kind.OneShot
-      case other       => Kind.Unknown(other)
-    }
-    def fromStringE(s: String) = fromString(s) match {
-      case Unknown(other) =>
-        Left(s"'$other' is not a member value of CompanyContract.Kind")
-      case contract => Right(contract)
-    }
-  }
+  object Kind:
+    given Decoder[Kind] = Decoder.decodeString.emap(fromStringE)
+    given Encoder[Kind] = Encoder[String].contramap(_.toString)
+    def fromStringE(s: String) = s match
+      case Kind.Oneshot.str => Kind.Oneshot.asRight
+      case Kind.UnlimitedOpen.str => Kind.UnlimitedOpen.asRight
+      case Kind.UnlimitedClosed.str => Kind.UnlimitedClosed.asRight
+      case contract => Left(s"'$contract' is not a member value of CompanyContract.Kind")
 
   implicit val companyContractCreateDecoder: Decoder[CreateRecord] =
     deriveDecoder

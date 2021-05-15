@@ -21,10 +21,16 @@ object create {
     )""".update
 
   val companyContracts =
-    sql"""CREATE TABLE IF NOT EXISTS company_contracts (
+    sql"""
+    DO $$$$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'company_contract_constr') THEN
+        CREATE TYPE company_contract_constr AS ENUM ('oneshot', 'unlimited_open', 'unlimited_closed');
+      END IF;
+    END $$$$;
+    CREATE TABLE IF NOT EXISTS company_contracts (
        id                 bigserial        PRIMARY KEY,
        company            bigint           NOT NULL references companies(id),
-       kind               text             NOT NULL
+       kind               company_contract_constr             NOT NULL
     )""".update
 
   val forms =

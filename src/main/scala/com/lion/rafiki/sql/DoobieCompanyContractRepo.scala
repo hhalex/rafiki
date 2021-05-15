@@ -5,17 +5,19 @@ import doobie.implicits._
 import cats.implicits._
 import com.lion.rafiki.domain.{Company, CompanyContract}
 import com.lion.rafiki.sql.SQLPagination.paginate
+import doobie.postgres.implicits.pgEnumStringOpt
 import doobie.Transactor
 import doobie.implicits._
 import doobie.util.meta.Meta
 
 private[sql] object CompanyContractSQL {
   import CompanySQL._
-  implicit val companyContractIdMeta: Meta[CompanyContract.Id] = createMetaId(
-    CompanyContract
+  given Meta[CompanyContract.Id] = createMetaId(CompanyContract)
+  given Meta[CompanyContract.Kind] = pgEnumStringOpt(
+    "company_contract_constr",
+    s => CompanyContract.Kind.fromStringE(s).toOption,
+    _.str
   )
-  implicit val companyContractKindMeta: Meta[CompanyContract.Kind] =
-    Meta[String].imap(CompanyContract.Kind.fromString)(_.toString)
 
   def byIdQ(id: CompanyContract.Id) =
     sql"""SELECT * FROM company_contracts WHERE id=$id"""
@@ -46,7 +48,7 @@ private[sql] object CompanyContractSQL {
 
 class DoobieCompanyContractRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
     extends CompanyContract.Repo[F] {
-  import CompanyContractSQL._
+  import CompanyContractSQL.{given, _}
   import com.lion.rafiki.domain.RepoError.ConnectionIOwithErrors
 
   override def create(

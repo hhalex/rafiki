@@ -15,7 +15,7 @@ import doobie.util.meta.Meta
 import org.joda.time.DateTime
 import java.sql.Timestamp
 private[sql] object FormSessionSQL {
-  import CompanyContractSQL._
+  import CompanyContractSQL.given
   import CompanySQL._
   import FormSQL._
   implicit val formSessionIdReader: Meta[FormSession.Id] = createMetaId(FormSession)
