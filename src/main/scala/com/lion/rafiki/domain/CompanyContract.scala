@@ -17,8 +17,9 @@ final case class CompanyContract[Company](
 
 trait ContractId
 object CompanyContract extends TaggedId[ContractId] {
-  import Company.{taggedIdDecoder, taggedIdEncoder}
 
+  import Company.Id.given
+  import Id.given
   enum Kind(val str: String):
     case Oneshot extends Kind("oneshot")
     case UnlimitedOpen extends Kind("unlimited_open")
@@ -33,13 +34,11 @@ object CompanyContract extends TaggedId[ContractId] {
       case Kind.UnlimitedClosed.str => Kind.UnlimitedClosed.asRight
       case contract => Left(s"'$contract' is not a member value of CompanyContract.Kind")
 
-  implicit val companyContractCreateDecoder: Decoder[CreateRecord] =
-    deriveDecoder
-  implicit val companyContractCreateEncoder: Encoder[CreateRecord] =
-    deriveEncoder
-  implicit val companyContractWithIdDecoder: Decoder[Record] = WithId.decoder
-  implicit val companyContractWithIdEncoder: Encoder[Record] = WithId.encoder
+  given [T: Encoder]: Encoder[CompanyContract[T]] = deriveEncoder
+  given [T: Decoder]: Decoder[CompanyContract[T]] = deriveDecoder
 
+  given Encoder[Record] = deriveEncoder
+  given Decoder[CreateRecord] = deriveDecoder
   type CreateRecord = CompanyContract[Company.Id]
   type Record = WithId[Id, CreateRecord]
 

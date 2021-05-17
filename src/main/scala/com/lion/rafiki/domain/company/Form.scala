@@ -18,15 +18,16 @@ case class Form[T](
 }
 trait FormId
 object Form extends TaggedId[FormId] {
-  import FormTree.{taggedIdDecoder, taggedIdEncoder}
-  import Company.{taggedIdDecoder, taggedIdEncoder}
-  implicit val formKeyEncoder: Encoder[FormTree.Key] = deriveEncoder
-  implicit def formDecoder[T: Decoder]: Decoder[Form[T]] = deriveDecoder
-  implicit def formEncoder[T: Encoder]: Encoder[Form[T]] = deriveEncoder
-  implicit val formCreateDecoder: Decoder[Create] = deriveDecoder
-  implicit val formUpdateDecoder: Decoder[Update] = WithId.decoder
-  implicit val formRecordEncoder: Encoder[Record] = WithId.encoder
-  implicit val formFullEncoder: Encoder[Full] = WithId.encoder
+  import Company.Id.given
+  import FormTree.given
+  import FormTree.Id.given
+  import Id.given
+  given [T: Decoder]: Decoder[Form[T]] = deriveDecoder
+  given [T: Encoder]: Encoder[Form[T]] = deriveEncoder
+
+  given Decoder[Create] = deriveDecoder
+  given Encoder[Full] = WithId.deriveEncoder
+  given Encoder[Record] = WithId.deriveEncoder
 
   type Create = Form[FormTree]
   type Update = WithId[Id, Create]
@@ -84,7 +85,7 @@ object Form extends TaggedId[FormId] {
         answerTableName = s"form${createdForm.id}_answers"
           .asInstanceOf[InviteAnswer.TableName]
         _ <- createdForm.data.tree.traverse(t =>
-          inviteAnswerRepo.overrideAnswerTable(answerTableName, t.labels)
+          inviteAnswerRepo.overrideAnswerTable(answerTableName, FormTree.labels(t))
         )
       yield createdForm).leftMap(ValidationError.Repo)
 
@@ -110,7 +111,7 @@ object Form extends TaggedId[FormId] {
           .asInstanceOf[InviteAnswer.TableName]
         _ <- result.data.tree
           .traverse(t =>
-            inviteAnswerRepo.overrideAnswerTable(answerTableName, t.labels)
+            inviteAnswerRepo.overrideAnswerTable(answerTableName, FormTree.labels(t))
           )
           .leftMap(ValidationError.Repo)
       yield result

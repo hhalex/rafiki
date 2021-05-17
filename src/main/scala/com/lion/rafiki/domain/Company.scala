@@ -5,18 +5,20 @@ import cats.Monad
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 
-final case class Company[User](name: String, rh_user: User) {
+final case class Company[User](name: String, rh_user: User):
   def withId(id: Company.Id) = WithId(id, this)
-}
 
 trait CompanyId
 object Company extends TaggedId[CompanyId] {
 
-  implicit def companyDecoder[T: Decoder]: Decoder[Company[T]] = deriveDecoder
-  implicit def companyEncoder[T: Encoder]: Encoder[Company[T]] = deriveEncoder
-  implicit val companyCreateDecoder: Decoder[Company.Create] = deriveDecoder
-  implicit val companyUpdateDecoder: Decoder[Company.Update] = WithId.decoder
-  implicit val companyWithIdFullEncoder: Encoder[Company.Full] = WithId.encoder
+  import Id.given
+  import User.Id.given
+  given [T: Decoder]: Decoder[Company[T]] = deriveDecoder
+  given [T: Encoder]: Encoder[Company[T]] = deriveEncoder
+  given Decoder[Create] = deriveDecoder
+  given Decoder[CreateRecord] = deriveDecoder
+  given Encoder[Update] = deriveEncoder
+  given Encoder[Full] = deriveEncoder
 
   type CreateRecord = Company[User.Id]
   type Record = WithId[Id, CreateRecord]

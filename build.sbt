@@ -1,10 +1,10 @@
 import sbt.ExclusionRule
 
 val Http4sVersion = "1.0.0-M21"
-val TsecVersion = "0.2.1"
+val CatsVersion = "2.6.0"
 val CirceVersion = "0.14.0-M5"
 val DoobieVersion = "1.0.0-M2"
-val Specs2Version = "4.10.5"
+val Specs2Version = "4.11.0"
 val LogbackVersion = "1.2.3"
 
 lazy val root = (project in file("."))
@@ -20,7 +20,8 @@ lazy val root = (project in file("."))
       "org.http4s"          %% "http4s-blaze-client" % Http4sVersion,
       "org.http4s"          %% "http4s-circe"        % Http4sVersion,
       "org.http4s"          %% "http4s-dsl"          % Http4sVersion,
-      ("com.github.t3hnar"   %% "scala-bcrypt"        % "4.3.0").cross(CrossVersion.for3Use2_13),
+      "org.typelevel"       %% "cats-core"           % CatsVersion,
+      ("com.github.t3hnar"  %% "scala-bcrypt"        % "4.3.0").cross(CrossVersion.for3Use2_13),
       "io.circe"            %% "circe-generic"       % CirceVersion,
       "io.circe"            %% "circe-core"       % CirceVersion,
       "io.circe"            %% "circe-parser"       % CirceVersion,
@@ -36,7 +37,8 @@ lazy val root = (project in file("."))
       "ch.qos.logback"      %  "logback-classic"     % LogbackVersion
     ),
     watchSources ++= (baseDirectory.value / "public/ui" ** "*").get,
-    Compile / resourceDirectory := file("ui") / "build"
+    Compile / resourceDirectory := file("ui") / "build",
+    Test / envVars := Map( "DATABASE_URL" -> "postgres://postgres:password@localhost:5432/postgres", "DEV" -> "1", "HOT_USERS" -> "admin:pass")
   )
 
 scalacOptions ++= Seq(
@@ -46,7 +48,7 @@ scalacOptions ++= Seq(
   "-Ykind-projector",
   "-Xsemanticdb",
   "-new-syntax",
-  "-Ysafe-init",
+  //"-Ysafe-init",
   "-unchecked",
   "-Xmigration",
   "-rewrite"

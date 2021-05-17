@@ -30,8 +30,8 @@ object CompanyContractSQLSpec extends Specification with IOChecker {
 
   check(byIdQ(companyContractId))
   check(byCompanyIdQ(companyId))
-  check(insertQ(companyId, CompanyContract.Kind.Unlimited))
-  check(updateQ(companyContractId, CompanyContract.Kind.OneShot))
+  check(insertQ(companyId, CompanyContract.Kind.UnlimitedOpen))
+  check(updateQ(companyContractId, CompanyContract.Kind.Oneshot))
   check(deleteQ(companyContractId))
   check(listAllQ(10, 10))
 

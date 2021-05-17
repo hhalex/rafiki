@@ -11,7 +11,7 @@ import doobie.implicits._
 import doobie.util.meta.Meta
 
 private[sql] object CompanyContractSQL {
-  import CompanySQL._
+  import CompanySQL.given
   given Meta[CompanyContract.Id] = createMetaId(CompanyContract)
   given Meta[CompanyContract.Kind] = pgEnumStringOpt(
     "company_contract_constr",

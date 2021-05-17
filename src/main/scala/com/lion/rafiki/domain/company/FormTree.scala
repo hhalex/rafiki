@@ -8,91 +8,121 @@ import com.lion.rafiki.domain.{
   RepoError,
   TaggedId,
   ValidationError,
-  WithId
+  WithId,
+  OrWithIdF,
+  WithIdF,
+  Fix
 }
+import WithIdF.given
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder}
+import cats.Functor
+import cats.Traverse
+import cats.Applicative
+import cats.Eval
+import doobie.util.Get
 
-type FormTreeP = FormTree.Text | FormTree.Question | FormTree.Group
-type FormTree = FormTreeP | WithId[FormTree.Id, FormTreeP]
-
-trait FormTreeId
-object FormTree extends TaggedId[FormTreeId] {
-  enum Kind:
-    case Question, Group, Text
-
-  object Kind:
-    def fromStringE(s: String) = s match
-      case "question" => Kind.Question.asRight
-      case "group"    => Kind.Group.asRight
-      case "text"     => Kind.Text.asRight
-      case other => Left(s"'$other' is not a member value of FormTree.Kind")
-    implicit val formTreeKindDecoder: Decoder[Kind] = Decoder[String].emap(Kind.fromStringE)
-    implicit val formTreeKindEncoder: Encoder[Kind] = Encoder[String].contramap(_.toString)
-
-  extension [T <: FormTreeP](tree: T)
-    def withId(id: Id) = WithId(id, tree)
-    def kind: Kind = tree match
-      case _: Text        => Kind.Text
-      case _: Question  => Kind.Question
-      case _: Group       => Kind.Group
-
-    def labels: Set[String] =
-      def rec(t: FormTreeP): List[String] = t match
-        case Question(label, _, _)    => List(label)
-        case _: Text                  => Nil
-        case Group(children)          => children.flatMap({
-          case WithId(id, treeP) => rec(treeP)
-          case treeP: FormTreeP => rec(treeP)
-        })
-      rec(tree).toSet
-    end labels
-
-  extension [T <: FormTreeP](treeWithId: WithId[FormTree.Id, T])
-    def key = (treeWithId.id, treeWithId.data.kind)
-    def kind: Kind = treeWithId.data.kind
-    def labels: Set[String] = treeWithId.data.labels
-
-  type Key = (Id, Kind)
-
-  case class Text(text: String)
-  case class Question(
+enum FormTreeP[+T]:
+  case Text(text: String) extends FormTreeP[Nothing]
+  case Question(
       label: String,
       text: String,
       answers: List[QuestionAnswer]
-  )
-  case class Group(children: List[FormTree])
+  ) extends FormTreeP[Nothing]
+  case Group(children: List[T])
+  def kind: FormTree.Kind = this match
+    case _: Text        => FormTree.Kind.Text
+    case _: Question    => FormTree.Kind.Question
+    case _: Group[_]       => FormTree.Kind.Group
+end FormTreeP
+object FormTreeP:
+  extension [T <: FormTreeP[_]](ftp: T)
+    def withId(id: FormTree.Id): WithId[FormTree.Id, T] = WithId(id, ftp)
 
-// Decoding
-  implicit val formTreePDecoder: Decoder[FormTreeP] =
-    deriveDecoder[Question].widen
-      .or(deriveDecoder[Text].widen)
-      .or(deriveDecoder[Group].widen)
+  given Functor[FormTreeP] with
+    def map[A, B](fa: FormTreeP[A])(f: A => B): FormTreeP[B] = fa match
+      case t: FormTreeP.Text => t
+      case q: FormTreeP.Question => q
+      case FormTreeP.Group(children) => FormTreeP.Group(children.map(f))
 
-  implicit val formTreeIdDecoder: Decoder[WithId[FormTree.Id, FormTreeP]] =
-    WithId.decoder
+  given Traverse[FormTreeP] with
+    def foldLeft[A, B](fa: FormTreeP[A], b: B)(f: (B, A) => B): B = ???
+    def foldRight[A, B](fa: FormTreeP[A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] = ???
+    def traverse[F[_]: Applicative, A, B](fa: FormTreeP[A])(f: A => F[B]): F[FormTreeP[B]] = fa match
+      case t: FormTreeP.Text => Applicative[F].pure(t)
+      case q: FormTreeP.Question => Applicative[F].pure(q)
+      case FormTreeP.Group(children) => children.traverse(f).map(FormTreeP.Group.apply)
 
-  implicit val formTreeDecoder: Decoder[FormTree] =
-    Decoder[WithId[FormTree.Id, FormTreeP]].widen
-      .or(Decoder[FormTreeP].widen)
 
-// Encoding
-  implicit val formTreePEncoder: Encoder[FormTreeP] = Encoder.instance {
-    case r: Text     => r.asJson(deriveEncoder[Text])
-    case r: Question => r.asJson(deriveEncoder[Question])
-    case r: Group    => r.asJson(deriveEncoder[Group])
+type FormTreeF[T] = OrWithIdF[FormTree.Id, FormTreeP][T]
+type FormTree = Fix[FormTreeF]
+type FormTreeWithIdF[T] = WithIdF[FormTree.Id, FormTreeP][T]
+type FormTreeWithId = Fix[FormTreeWithIdF]
+
+trait FormTreeId
+object FormTree extends TaggedId[FormTreeId] {
+
+  extension (treeWithId: WithId[FormTree.Id, FormTreeP[?]])
+    def key: FormTree.Key = (treeWithId.id, treeWithId.data.kind)
+    def kind = treeWithId.data.kind
+
+  val extractLabels: FormTreeP[List[String]] => List[String] = {
+    case FormTreeP.Question(label, _, _) => List(label)
+    case FormTreeP.Text(_) => Nil
+    case FormTreeP.Group(children) => children.flatten
   }
 
-  implicit val formTreeIdEncoder: Encoder[WithId[FormTree.Id, FormTreeP]] =
-    WithId.encoder
+  //def labels(t: FormTree): Set[String] = cataOrWithId[FormTreeP, List[String], FormTree.Id](extractLabels)(t).toSet
+  def labels(u: Update): Set[String] = WithIdF.cata[FormTreeP, List[String], FormTree.Id](extractLabels)(u).toSet
 
-  implicit val formTreeEncoder: Encoder[FormTree] = Encoder.instance {
-    case r: WithId[FormTree.Id, FormTreeP] => r.asJson
-    case r: FormTreeP                  => r.asJson
+  enum Kind(val str: String):
+    case Question extends Kind("question")
+    case Group extends Kind("group")
+    case Text extends Kind("text")
+
+  object Kind:
+    def fromStringE(s: String) = s match
+      case Kind.Question.str => Kind.Question.asRight
+      case Kind.Group.str    => Kind.Group.asRight
+      case Kind.Text.str     => Kind.Text.asRight
+      case other => Left(s"'$other' is not a member value of FormTree.Kind")
+    given Decoder[Kind] = Decoder[String].emap(Kind.fromStringE)
+    given Encoder[Kind] = Encoder.instance { _.str.asJson }
+
+  type Key = (Id, Kind)
+
+  import QuestionAnswer.given
+  import Id.given
+
+  given [T: Decoder]: Decoder[FormTreeP[T]] =
+    deriveDecoder[FormTreeP.Question].widen[FormTreeP[T]]
+      .or(deriveDecoder[FormTreeP.Text].widen[FormTreeP[T]])
+      .or(deriveDecoder[FormTreeP.Group[T]].widen[FormTreeP[T]])
+
+  given [T: Encoder]: Encoder[FormTreeP[T]] = Encoder.instance {
+    case r: FormTreeP.Text     => r.asJson(deriveEncoder[FormTreeP.Text])
+    case r: FormTreeP.Question => r.asJson(deriveEncoder[FormTreeP.Question])
+    case r: FormTreeP.Group[T]    => r.asJson(deriveEncoder[FormTreeP.Group[T]])
+  }
+  given [T: Decoder]: Decoder[OrWithIdF[FormTree.Id, FormTreeP][T]] =
+    Decoder[FormTreeWithIdF[T]].widen[OrWithIdF[FormTree.Id, FormTreeP][T]]
+      .or(Decoder[FormTreeP[T]].widen[OrWithIdF[FormTree.Id, FormTreeP][T]])
+
+  given [T: Encoder]: Encoder[OrWithIdF[FormTree.Id, FormTreeP][T]] = Encoder.instance {
+    case r: FormTreeWithIdF[T] => r.asJson
+    case r: FormTreeP[T] => r.asJson
   }
 
-  type Create = FormTreeP
-  type Update = WithId[Id, FormTreeP]
+  given [T: Decoder]: Decoder[FormTreeWithIdF[T]] = WithId.deriveDecoder
+  given [T: Encoder]: Encoder[FormTreeWithIdF[T]] = WithId.deriveEncoder
+
+  import OrWithIdF.given
+  given Decoder[FormTree] = Fix.deriveDecoder[FormTreeF]
+  given Encoder[FormTree] = Fix.deriveEncoder[FormTreeF]
+  given Encoder[Update] = Fix.deriveEncoder[FormTreeWithIdF]
+
+  type Create = Fix[FormTreeP]
+  type Update = FormTreeWithId
   type Record = Update
 }

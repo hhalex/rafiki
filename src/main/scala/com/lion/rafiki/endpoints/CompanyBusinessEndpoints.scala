@@ -1,6 +1,7 @@
 package com.lion.rafiki.endpoints
 
 import cats.effect.{Async, Sync}
+import cats.Applicative
 import cats.syntax.all._
 import com.lion.rafiki.auth.UserAuth
 import com.lion.rafiki.domain.company.{Form, FormSession, SessionInvite}
@@ -8,8 +9,10 @@ import com.lion.rafiki.domain.{Company, ValidationError}
 import org.http4s.{AuthedRoutes, HttpRoutes}
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
+import org.http4s.EntityEncoder
 
 class CompanyBusinessEndpoints[F[_]: Async] extends Http4sDsl[F] {
+
   import CirceEntityDecoder._
   import CirceEntityEncoder._
   import Pagination._

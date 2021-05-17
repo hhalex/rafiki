@@ -4,14 +4,14 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import cats.implicits.catsSyntaxOptionId
 import com.lion.rafiki.Conf
-import com.lion.rafiki.domain.company.{FormSession, FormSessionInvite}
+import com.lion.rafiki.domain.company.{FormSession, SessionInvite}
 import com.lion.rafiki.domain.User
 import doobie.implicits._
 import doobie.specs2._
 import doobie.util.transactor.Transactor
 import org.specs2.mutable.Specification
 
-object FormSessionInviteSQLSpec extends Specification with IOChecker {
+object SessionInviteSQLSpec extends Specification with IOChecker {
 
   val conf = Conf[IO]().unsafeRunSync()
 
@@ -26,8 +26,8 @@ object FormSessionInviteSQLSpec extends Specification with IOChecker {
     xa
   }
 
-  import FormSessionInviteSQL._
-  val formSessionInviteId = FormSessionInvite.tag(2)
+  import SessionInviteSQL._
+  val formSessionInviteId = SessionInvite.tag(2)
   val formSessionId = FormSession.tag(2)
   val userId = User.tag(2)
 

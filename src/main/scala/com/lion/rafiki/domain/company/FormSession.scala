@@ -47,22 +47,23 @@ object FormSession extends TaggedId[SessionId] {
     case Pending, Started, Finished
   }
 
-  import Form.{taggedIdDecoder, taggedIdEncoder}
   val dateFormatter = ISODateTimeFormat.basicDateTime()
-  implicit val decodeDateTime: Decoder[DateTime] = Decoder.decodeString.emap { s =>
+  given Decoder[DateTime] = Decoder.decodeString.emap { s =>
     try {
       Right(dateFormatter.parseDateTime(s))
     } catch {
       case NonFatal(e) => Left(e.getMessage)
     }
   }
-  implicit val encodeDateTime: Encoder[DateTime] = Encoder.instance { s =>
+  given Encoder[DateTime] = Encoder.instance { s =>
     dateFormatter.print(s).asJson
   }
-  implicit val formSessionCreateDecoder: Decoder[Create] = deriveDecoder
-  implicit val formSessionCreateEncoder: Encoder[Create] = deriveEncoder
-  implicit val formSessionUpdateDecoder: Decoder[Update] = WithId.decoder
-  implicit val formSessionFullEncoder: Encoder[Full] = WithId.encoder
+
+  import Form.Id.given
+  import FormSession.Id.given
+  given Decoder[Create] = deriveDecoder
+  given Encoder[Create] = deriveEncoder
+  given Encoder[Full] = WithId.deriveEncoder
 
   trait Repo[F[_]] {
     type Result[T] = EitherT[F, RepoError, T]
@@ -129,7 +130,6 @@ object FormSession extends TaggedId[SessionId] {
                 case Nil => EitherT.rightT[F, ValidationError](contract)
                 case _   => contractFull
               }
-          case _ => contractFull
         }
       for
         _ <- formValidation.hasOwnership(formId, companyId.some)

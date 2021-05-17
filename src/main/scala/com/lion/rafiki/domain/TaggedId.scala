@@ -10,6 +10,7 @@ trait TaggedId[T] {
   val tag: Long => Id = _.asInstanceOf[Id]
   val unTag: Id => Long = identity
 
-  implicit val taggedIdDecoder: Decoder[Id] = Decoder[Long].map(tag)
-  implicit val taggedIdEncoder: Encoder[Id] = Encoder[Long].contramap(unTag)
+  object Id:
+    given Decoder[Id] = Decoder[Long].map(tag)
+    given Encoder[Id] = Encoder[Long].contramap(unTag)
 }

@@ -12,12 +12,11 @@ import cats.Show.Shown.mat
 import doobie.syntax.SqlInterpolator.SingleFragment.fromPut
 
 private[sql] object CompanySQL {
-  import UserSQL._
-  implicit val companyIdReader: Meta[Company.Id] = createMetaId(Company)
-  implicit val companyWithUserReader: Read[Company.Full] =
-    Read[(Company.Record, User.Record)].map({
-      case (company, user) => company.mapData(_.copy(rh_user = user.data))
-    })
+  import UserSQL.given
+  given Meta[Company.Id] = createMetaId(Company)
+  given Read[Company.Full] = Read[(Company.Record, User.Record)].map {
+    case (company, user) => company.mapData(_.copy(rh_user = user.data))
+  }
 
   def byIdQ(id: Company.Id) =
     sql"""SELECT * FROM companies WHERE id=$id""".query[Company.Record]
@@ -53,7 +52,7 @@ private[sql] object CompanySQL {
 
 class DoobieCompanyRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
     extends Company.Repo[F] {
-  import CompanySQL._
+  import CompanySQL.{_, given}
   import com.lion.rafiki.domain.RepoError._
 
   override def create(company: Company.CreateRecord): Result[Company.Record] =

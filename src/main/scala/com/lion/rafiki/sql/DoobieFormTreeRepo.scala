@@ -6,8 +6,8 @@ import cats.implicits._
 import cats.syntax.all._
 import cats.effect.MonadCancel
 import cats.implicits.toFunctorOps
-import com.lion.rafiki.domain.company.{Form, QuestionAnswer, QuestionAnswerP, FormTree, FormTreeP}
-import com.lion.rafiki.domain.{Company, RepoError, WithId}
+import com.lion.rafiki.domain.company.{Form, QuestionAnswer, QuestionAnswerP, FormTree, FormTreeP }
+import com.lion.rafiki.domain.{Company, RepoError, WithId, Fix}
 import com.lion.rafiki.sql.SQLPagination.paginate
 import doobie.{LogHandler, Transactor}
 import doobie.free.connection.ConnectionIO
@@ -21,39 +21,37 @@ import doobie.util.update.Update0
 
 private[sql] object FormTreeSQL {
 
-  implicit val formTreeIdMeta: Meta[FormTree.Id] = createMetaId(FormTree)
-  implicit val formTreeQuestionAnswerIdMeta
-      : Meta[QuestionAnswer.Id] = createMetaId(QuestionAnswer)
-  implicit val formTreeKindMeta: Meta[FormTree.Kind] = pgEnumStringOpt(
+  given ftId: Meta[FormTree.Id] = createMetaId(FormTree)
+  given qaId: Meta[QuestionAnswer.Id] = createMetaId(QuestionAnswer)
+  given ftKind: Meta[FormTree.Kind] = pgEnumStringOpt(
     "form_tree_constr",
     s => FormTree.Kind.fromStringE(s).toOption,
     _.toString.toLowerCase
   )
-  implicit val formTreeGroupReader: Read[WithId[FormTree.Id, FormTree.Group]] =
-    Read[FormTree.Id].map(id => FormTree.Group(List.empty[FormTree]).withId(id))
 
-  implicit val questionAnswerReader: Read[WithId[QuestionAnswer.Id, QuestionAnswerP]] =
+  given ftGroupWid: Read[WithId[FormTree.Id, FormTreeP.Group[?]]] = Read[FormTree.Id].map(id => FormTreeP.Group(Nil).withId(id))
+  given ftQuestionWid: Read[WithId[FormTree.Id, FormTreeP.Question]] = Read[(FormTree.Id, String, String)].map {
+    case (id, label, text) => FormTreeP.Question(label, text, Nil).withId(id)
+  }
+
+  given qaWid: Read[WithId[QuestionAnswer.Id, QuestionAnswerP]] =
     Read[
       (QuestionAnswer.Id, FormTree.Id, Option[String], Option[Int])
     ].map({
       case (id, _, label, Some(num_value)) =>
-        QuestionAnswer.Numeric(label, num_value).withId(id)
+        QuestionAnswerP.Numeric(label, num_value).withId(id)
       case (id, _, label, None) =>
-        QuestionAnswer.FreeText(label).withId(id)
+        QuestionAnswerP.FreeText(label).withId(id)
     })
 
-  implicit val questionWithKeyReader: Read[WithId[FormTree.Id, FormTree.Question]] =
-    Read[(FormTree.Id, String, String)].map({ case (id, label, text) =>
-      FormTree.Question(label, text, Nil).withId(id)
-    })
-
+  given han: LogHandler = LogHandler.jdkLogHandler
 
   def getTreeQuestionQ(id: FormTree.Id) = sql"""
      SELECT ft.id, ftq.label, ftq.text FROM form_trees ft
        LEFT JOIN form_tree_questions ftq
          ON (ft.id = ftq.id AND ft.kind = ftq.kind)
        WHERE ft.id=$id
-  """.query[WithId[FormTree.Id, FormTree.Question]]
+  """.query[WithId[FormTree.Id, FormTreeP.Question]]
 
   def getQuestionAnswersQ(id: FormTree.Id) = sql"""
      SELECT * FROM form_tree_question_answers
@@ -65,14 +63,14 @@ private[sql] object FormTreeSQL {
        LEFT JOIN form_tree_texts ftt
          ON (ft.id = ftt.id AND ft.kind = ftt.kind)
        WHERE ft.id=$id
-  """.query[WithId[FormTree.Id, FormTree.Text]]
+  """.query[WithId[FormTree.Id, FormTreeP.Text]]
 
   def getTreeGroupQ(id: FormTree.Id) = sql"""
      SELECT ft.id FROM form_trees ft
        LEFT JOIN form_tree_groups ftg
          ON (ft.id = ftg.id AND ft.kind = ftg.kind)
        WHERE ft.id=$id
-  """.query[WithId[FormTree.Id, FormTree.Group]]
+  """.query[WithId[FormTree.Id, FormTreeP.Group[?]]]
 
   def getTreeChildKeysByIdQ(parent: FormTree.Key): Query0[FormTree.Key] =
     sql"""SELECT id, kind FROM form_trees WHERE parent_id=${parent._1} AND parent_kind=${parent._2}"""
@@ -154,7 +152,7 @@ private[sql] object FormTreeSQL {
     sql"UPDATE form_tree_groups SET id=$id WHERE id=$id".update
   }
 
-    def getTreeRecCIO(key: FormTree.Key): ConnectionIO[WithId[FormTree.Id, FormTreeP]] = {
+  def getTreeRecCIO(key: FormTree.Key): ConnectionIO[FormTree.Update] = {
     val (id, kind) = key
     kind match {
       case FormTree.Kind.Group =>
@@ -162,15 +160,14 @@ private[sql] object FormTreeSQL {
           group <- getTreeGroupQ(id).unique
           childHeaders <- getTreeChildKeysByIdQ(key).to[List]
           children <- childHeaders.traverse(getTreeRecCIO)
-        yield group.mapData(_.copy(children = children.asInstanceOf[List[FormTree]]))
+        yield Fix(group.mapData(_.copy(children = children)))
       case FormTree.Kind.Question => (
         for
           question <- getTreeQuestionQ(id).unique
           questionAnswers <- getQuestionAnswersQ(question.id).to[List]
-        yield question.mapData(_.copy(answers = questionAnswers))
+        yield Fix(question.mapData(_.copy(answers = questionAnswers)))
       )
-      case FormTree.Kind.Text => getTreeTextQ(id).unique.widen
-      case _                   => throw new Exception("Can't get unknown kind of tree")
+      case FormTree.Kind.Text => getTreeTextQ(id).unique.widen.map(Fix.apply)
     }
   }
 
@@ -197,9 +194,9 @@ private[sql] object FormTreeSQL {
       tree: FormTree,
       parent: Option[FormTree.Key]
   ): ConnectionIO[(FormTree.Key, AccTreeNodes, AccQuestionAnswers)] = {
-    import FormTree._
-    tree match {
-      case WithId(id, g: Group) => for
+    import FormTreeP._
+    tree.unfix match {
+      case WithId(id, g: Group[FormTree]) => for
           updatedKey <- updateTreeGroupCIO(g.withId(id), parent)
           updatedChildrenKeys <- g.children.traverse(c =>
             addOrUpdateTreeNodesRec(c, updatedKey.some)
@@ -216,7 +213,7 @@ private[sql] object FormTreeSQL {
         question <- updateTreeQuestionCIO(q.withId(id), parent)
         answers <- q.answers.traverse(syncQuestionAnswer(_, question._1))
       yield (question, Nil, (question._1, answers) :: Nil)
-      case g: Group =>
+      case g: Group[FormTree] =>
         for
           createdKey <- insertTreeGroupCIO(g, parent)
           childKeys <- g.children.traverse(c =>
@@ -241,20 +238,20 @@ private[sql] object FormTreeSQL {
       a: QuestionAnswer,
       questionId: FormTree.Id
   ): ConnectionIO[QuestionAnswer.Id] = a match {
-    case QuestionAnswer.FreeText(label) =>
+    case QuestionAnswerP.FreeText(label) =>
       insertQuestionAnswerQ(questionId, label, None)
         .withUniqueGeneratedKeys[QuestionAnswer.Id]("id")
-    case QuestionAnswer.Numeric(label, value) =>
+    case QuestionAnswerP.Numeric(label, value) =>
       insertQuestionAnswerQ(questionId, label, value.some)
         .withUniqueGeneratedKeys[QuestionAnswer.Id]("id")
-    case WithId(id, QuestionAnswer.FreeText(label)) =>
+    case WithId(id, QuestionAnswerP.FreeText(label)) =>
         updateQuestionAnswerQ(id, questionId, label, None).run.as(id)
-    case WithId(id, QuestionAnswer.Numeric(label, value)) =>
+    case WithId(id, QuestionAnswerP.Numeric(label, value)) =>
         updateQuestionAnswerQ(id, questionId, label, value.some).run.as(id)
   }
-
+  import FormTree.key
   def updateTreeGroupCIO(
-      g: WithId[FormTree.Id, FormTree.Group],
+      g: WithId[FormTree.Id, FormTreeP.Group[FormTree]],
       parent: Option[FormTree.Key]
   ): ConnectionIO[FormTree.Key] =
     for
@@ -263,7 +260,7 @@ private[sql] object FormTreeSQL {
     yield g.key
 
   def insertTreeGroupCIO(
-      g: FormTree.Group,
+      g: FormTreeP.Group[FormTree],
       parent: Option[FormTree.Key]
   ): ConnectionIO[FormTree.Key] =
     for
@@ -273,7 +270,7 @@ private[sql] object FormTreeSQL {
     yield (generatedId, g.kind)
 
   def insertTreeTextCIO(
-      t: FormTree.Text,
+      t: FormTreeP.Text,
       parent: Option[FormTree.Key]
   ): ConnectionIO[FormTree.Key] =
     for
@@ -283,7 +280,7 @@ private[sql] object FormTreeSQL {
     yield (generatedId, t.kind)
 
   def updateTreeTextCIO(
-      t: WithId[FormTree.Id, FormTree.Text],
+      t: WithId[FormTree.Id, FormTreeP.Text],
       parent: Option[FormTree.Key]
   ): ConnectionIO[FormTree.Key] =
     for
@@ -292,7 +289,7 @@ private[sql] object FormTreeSQL {
     yield t.key
 
   def insertTreeQuestionCIO(
-      q: FormTree.Question,
+      q: FormTreeP.Question,
       parent: Option[FormTree.Key]
   ): ConnectionIO[FormTree.Key] =
     for
@@ -302,7 +299,7 @@ private[sql] object FormTreeSQL {
     yield (generatedId, q.kind)
 
   def updateTreeQuestionCIO(
-      q: WithId[FormTree.Id, FormTree.Question],
+      q: WithId[FormTree.Id, FormTreeP.Question],
       parent: Option[FormTree.Key]
   ): ConnectionIO[FormTree.Key] =
     for

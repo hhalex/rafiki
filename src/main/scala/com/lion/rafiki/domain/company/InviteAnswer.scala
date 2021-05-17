@@ -9,12 +9,14 @@ import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 type Label = String
 case class AnswerValue(numeric: Option[Int], freetext: Option[String])
 
-case class InviteAnswer(values: Map[Label, AnswerValue]) {
+object AnswerValue:
+  given Decoder[AnswerValue] = deriveDecoder
+  given Encoder[AnswerValue] = deriveEncoder
+
+case class InviteAnswer(values: Map[Label, AnswerValue]):
   def withId(id: SessionInvite.Id) = WithId(id, this)
-}
 
 object InviteAnswer {
-  import SessionInvite.{taggedIdDecoder, taggedIdEncoder}
   opaque type TableName <: String = String
 
   type Create = InviteAnswer
@@ -22,16 +24,11 @@ object InviteAnswer {
   type Record = Update
   type Full = Update
 
-  implicit val answerValueCreateDecoder: Decoder[AnswerValue] = deriveDecoder
-  implicit val answerValueCreateEncoder: Encoder[AnswerValue] = deriveEncoder
-  implicit val inviteCreateDecoder: Decoder[Create] = deriveDecoder
-  implicit val inviteCreateEncoder: Encoder[Create] = deriveEncoder
-  implicit val inviteUpdateDecoder: Decoder[Update] = WithId.decoder
-  implicit val inviteFullEncoder: Encoder[Full] = WithId.encoder
+  given Decoder[Create] = deriveDecoder
+  given Encoder[Create] = deriveEncoder
 
   trait Repo[F[_]] {
     type Result[T] = EitherT[F, RepoError, T]
     def overrideAnswerTable(id: TableName, labels: Set[String]): Result[Unit]
-
   }
 }

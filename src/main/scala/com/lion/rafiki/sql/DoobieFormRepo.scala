@@ -20,11 +20,11 @@ import doobie.util.query.Query0
 import doobie.util.update.Update0
 
 private[sql] object FormSQL {
-  import CompanySQL._
-  import FormTreeSQL.{formTreeIdMeta, formTreeKindMeta, getTreeRecCIO, syncTree, deleteTreeQ}
-  implicit val formIdMeta: Meta[Form.Id] = createMetaId(Form)
+  import CompanySQL.given
+  import FormTreeSQL.{getTreeRecCIO, syncTree, deleteTreeQ, given}
 
-  implicit val formRecordReader: Read[Form.Record] = Read[
+  given Meta[Form.Id] = createMetaId(Form)
+  given Read[Form.Record] = Read[
     (
         Form.Id,
         Option[Company.Id],
@@ -39,7 +39,7 @@ private[sql] object FormSQL {
     })
 
 
-  implicit val han: LogHandler = LogHandler.jdkLogHandler
+  given han: LogHandler = LogHandler.jdkLogHandler
 
   def byIdQ(id: Form.Id) =
     sql"""SELECT * FROM forms WHERE id=$id""".query[Form.Record]
@@ -85,7 +85,7 @@ private[sql] object FormSQL {
 
 class DoobieFormRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
     extends Form.Repo[F] {
-  import FormSQL._
+  import FormSQL.{_, given}
   import FormTreeSQL.{deleteTreeQ, syncTree}
   import RepoError.ConnectionIOwithErrors
 

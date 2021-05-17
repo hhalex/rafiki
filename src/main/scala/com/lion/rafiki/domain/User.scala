@@ -5,7 +5,7 @@ import cats.Monad
 import cats.syntax.all._
 import com.lion.rafiki.auth.PasswordHasher
 import io.circe.{Decoder, Encoder, Json}
-import io.circe.generic.semiauto.deriveDecoder
+import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.syntax.EncoderOps
 
 final case class User[Password](
@@ -20,12 +20,13 @@ final case class User[Password](
 trait UserId
 object User extends TaggedId[UserId] {
 
-  implicit def userPassStrEncoder[T]: Encoder[User[T]] = Encoder.instance {
+  import User.Id.given
+  given [T]: Encoder[User[T]] = Encoder.instance {
     u => Json.obj("username" -> u.username.asJson)
   }
-  implicit val userCreateDecoder: Decoder[User.Create] = deriveDecoder
-  implicit val userUpdateDecoder: Decoder[User.Update] = WithId.decoder
-  implicit val userFullEncoder: Encoder[User.Full] = WithId.encoder
+  given Decoder[Create] = deriveDecoder
+  given Decoder[Update] = deriveDecoder
+  given Encoder[Full] = deriveEncoder
 
   case class Authed(email: String)
 

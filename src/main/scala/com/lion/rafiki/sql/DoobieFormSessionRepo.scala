@@ -16,11 +16,11 @@ import org.joda.time.DateTime
 import java.sql.Timestamp
 private[sql] object FormSessionSQL {
   import CompanyContractSQL.given
-  import CompanySQL._
-  import FormSQL._
-  implicit val formSessionIdReader: Meta[FormSession.Id] = createMetaId(FormSession)
-  implicit val han: LogHandler = LogHandler.jdkLogHandler
-  implicit val jodaTime: Meta[DateTime] = Meta[Timestamp].timap(ts => new DateTime(ts.getTime()))(t => new Timestamp(t.getMillis()))
+  import CompanySQL.given
+  import FormSQL.given
+
+  given Meta[FormSession.Id] = createMetaId(FormSession)
+  given Meta[DateTime] = Meta[Timestamp].timap(ts => new DateTime(ts.getTime()))(t => new Timestamp(t.getMillis()))
 
   def byIdQ(id: FormSession.Id) =
     sql"""SELECT id, form_id, name, start_date, end_date FROM form_sessions WHERE id=$id"""
@@ -77,7 +77,7 @@ private[sql] object FormSessionSQL {
 
 class DoobieFormSessionRepo[F[_]: TaglessMonadCancel](val xa: Transactor[F])
     extends FormSession.Repo[F] {
-  import FormSessionSQL._
+  import FormSessionSQL.{given, _}
   import com.lion.rafiki.domain.RepoError.ConnectionIOwithErrors
 
   override def create(

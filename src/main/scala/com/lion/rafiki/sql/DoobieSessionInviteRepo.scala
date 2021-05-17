@@ -12,14 +12,13 @@ import doobie.util.Read
 import doobie.util.meta.Meta
 
 private[sql] object SessionInviteSQL {
-  import FormSessionSQL._
-  import UserSQL._
-  implicit val SessionInviteIdReader: Meta[SessionInvite.Id] =
-    createMetaId(SessionInvite)
-  implicit val SessionInviteFullReader: Read[SessionInvite.Full] =
-    Read[(SessionInvite.Record, User.Record)].map({ case (invite, user) =>
-      invite.mapData(_.copy(user = user))
-    })
+  import FormSessionSQL.given
+  import UserSQL.given
+  given Meta[SessionInvite.Id] = createMetaId(SessionInvite)
+  given Read[SessionInvite.Full] = Read[(SessionInvite.Record, User.Record)].map {
+    case (invite, user) => invite.mapData(_.copy(user = user))
+  }
+
   val listFullInvitesFragment =
     fr"""SELECT fsi.form_session_id, fsi.id, u.email, fsi.team, fsi.accept_conditions FROM form_session_invites fsi LEFT JOIN users u ON fsi.user_id = u.id"""
   def byIdQ(id: SessionInvite.Id) =
@@ -67,7 +66,7 @@ private[sql] object SessionInviteSQL {
 class DoobieSessionInviteRepo[F[_]: TaglessMonadCancel](
     val xa: Transactor[F]
 ) extends SessionInvite.Repo[F] {
-  import SessionInviteSQL._
+  import SessionInviteSQL.{given, _}
   import com.lion.rafiki.domain.RepoError._
 
   override def create(

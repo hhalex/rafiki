@@ -11,7 +11,9 @@ case class SessionInvite[User](user: User, team: String, acceptConditions: Optio
 }
 trait InviteId
 object SessionInvite extends TaggedId[InviteId] {
-  import User.{taggedIdDecoder, taggedIdEncoder}
+
+  import User.Id.given
+  import Id.given
   type Create = SessionInvite[User.Create]
   type CreateRecord = SessionInvite[User.Id]
   type Update = WithId[Id, Create]
@@ -20,16 +22,13 @@ object SessionInvite extends TaggedId[InviteId] {
   type UpdateRecord = Record
   type Full = WithId[Id, SessionInvite[User.Full]]
 
-  implicit def sessionInviteDecoder[T: Decoder]: Decoder[SessionInvite[T]] = deriveDecoder
-  implicit def sessionInviteEncoder[T: Encoder]: Encoder[SessionInvite[T]] = deriveEncoder
-  implicit val sessionInviteCreateDecoder: Decoder[Create] = deriveDecoder
-  implicit val sessionInviteCreateRecordDecoder: Decoder[CreateRecord] = deriveDecoder
-  implicit val sessionInviteUpdateDecoder: Decoder[Update] = WithId.decoder
-  implicit val sessionInviteUpdateRecordDecoder: Decoder[Record] = WithId.decoder
-  implicit val sessionInviteUpdateRecordEmailDecoder: Decoder[RecordWithEmail] = WithId.decoder
-  implicit val sessionInviteRecordEncoder: Encoder[Record] = WithId.encoder
-  implicit val sessionInviteRecordEmailEncoder: Encoder[RecordWithEmail] = WithId.encoder
-  implicit val sessionInviteFullEncoder: Encoder[Full] = WithId.encoder
+  given [T: Decoder]: Decoder[SessionInvite[T]] = deriveDecoder
+  given [T: Encoder]: Encoder[SessionInvite[T]] = deriveEncoder
+  given Decoder[Create] = deriveDecoder
+  given Decoder[CreateRecord] = deriveDecoder
+  given Encoder[Full] = WithId.deriveEncoder
+  given Encoder[RecordWithEmail] = WithId.deriveEncoder
+  given Encoder[Record] = WithId.deriveEncoder
 
   trait Repo[F[_]] {
     type Result[T] = EitherT[F, RepoError, T]
