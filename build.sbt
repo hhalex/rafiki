@@ -1,9 +1,9 @@
 import sbt.ExclusionRule
 
-val Http4sVersion = "1.0.0-M21"
-val CatsVersion = "2.6.0"
-val CirceVersion = "0.14.0-M5"
-val DoobieVersion = "1.0.0-M2"
+val Http4sVersion = "1.0.0-M22"
+val CatsVersion = "2.6.1"
+val CirceVersion = "0.14.0-M7"
+val DoobieVersion = "1.0.0-M4"
 val Specs2Version = "4.11.0"
 val LogbackVersion = "1.2.3"
 
@@ -12,10 +12,10 @@ lazy val root = (project in file("."))
     organization := "lion",
     name := "rafiki",
     version := "0.0.1-SNAPSHOT",
-    scalaVersion := "3.0.0-RC2",
-    crossScalaVersions ++= Seq("2.13.5", "3.0.0-RC2"),
+    scalaVersion := "3.0.0",
+    crossScalaVersions ++= Seq("2.13.5", "3.0.0"),
     libraryDependencies ++= Seq(
-      ("com.github.nscala-time" %% "nscala-time" % "2.26.0").cross(CrossVersion.for3Use2_13),
+      "com.github.nscala-time" %% "nscala-time"      % "2.28.0",
       "org.http4s"          %% "http4s-blaze-server" % Http4sVersion,
       "org.http4s"          %% "http4s-blaze-client" % Http4sVersion,
       "org.http4s"          %% "http4s-circe"        % Http4sVersion,

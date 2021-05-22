@@ -32,7 +32,7 @@ import doobie.implicits._
 import fs2._
 import org.http4s.implicits._
 import org.http4s.server.Router
-import org.http4s.server.blaze.BlazeServerBuilder
+import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.server.middleware.Logger
 
 import java.time.Clock
