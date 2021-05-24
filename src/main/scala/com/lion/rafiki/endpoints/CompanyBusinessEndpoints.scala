@@ -32,8 +32,8 @@ class CompanyBusinessEndpoints[F[_]: Async] extends Http4sDsl[F] {
         // Create form
         case req @ POST -> Root / FormRoute as companyUser =>
           val action = for
-            form <- req.req.attemptAs[Form.Create].leftMap(ValidationError.Decoding)
-            result <- formService.create(form, companyUser.id.some)
+            form <- req.req.attemptAs[Form.Create].leftWiden
+            result <- formService.create(form, companyUser.id.some).leftWiden
           yield result
 
           action.value.flatMap {
@@ -43,8 +43,8 @@ class CompanyBusinessEndpoints[F[_]: Async] extends Http4sDsl[F] {
         // Update form
         case req @ PUT -> Root / FormRoute / FormIdVar(id) as companyUser =>
           val action = for
-            form <- req.req.attemptAs[Form.Create].leftMap(ValidationError.Decoding)
-            result <- formService.update(form.withId(id), companyUser.id.some)
+            form <- req.req.attemptAs[Form.Create].leftWiden
+            result <- formService.update(form.withId(id), companyUser.id.some).leftWiden
           yield result
 
           action.value.flatMap {
@@ -79,8 +79,8 @@ class CompanyBusinessEndpoints[F[_]: Async] extends Http4sDsl[F] {
         // Create session of a form
         case req @ POST -> Root / FormRoute / FormIdVar(formId) / SessionRoute as companyUser =>
           val action = for
-            formSession <- req.req.attemptAs[FormSession.Create].leftMap(ValidationError.Decoding)
-            result <- formSessionService.create(formSession, formId, companyUser.id)
+            formSession <- req.req.attemptAs[FormSession.Create].leftWiden
+            result <- formSessionService.create(formSession, formId, companyUser.id).leftWiden
           yield result
 
           action.value.flatMap {
@@ -90,8 +90,8 @@ class CompanyBusinessEndpoints[F[_]: Async] extends Http4sDsl[F] {
         // update session
         case req @ PUT -> Root / SessionRoute / FormSessionIdVar(id) as companyUser =>
           val action = for
-            form <- req.req.attemptAs[FormSession].leftMap(ValidationError.Decoding)
-            result <- formSessionService.update(form.withId(id), companyUser.id)
+            form <- req.req.attemptAs[FormSession].leftWiden
+            result <- formSessionService.update(form.withId(id), companyUser.id).leftWiden
           yield result
 
           action.value.flatMap {
@@ -139,8 +139,8 @@ class CompanyBusinessEndpoints[F[_]: Async] extends Http4sDsl[F] {
         // create invite on a session
         case req @ POST -> Root / SessionRoute / FormSessionIdVar(formSessionId) / InviteRoute as companyUser =>
           val action = for
-            formSessionInvite <- req.req.attemptAs[SessionInvite[String]].leftMap(ValidationError.Decoding)
-            result <- formSessionInviteService.create(formSessionInvite, formSessionId, companyUser.id)
+            formSessionInvite <- req.req.attemptAs[SessionInvite[String]].leftWiden
+            result <- formSessionInviteService.create(formSessionInvite, formSessionId, companyUser.id).leftWiden
           yield result
 
           action.value.flatMap({
@@ -161,8 +161,8 @@ class CompanyBusinessEndpoints[F[_]: Async] extends Http4sDsl[F] {
         // update invite
         case req @ PUT -> Root / InviteRoute / FormSessionInviteIdVar(inviteId) as companyUser =>
           val action = for
-            invite <- req.req.attemptAs[SessionInvite[String]].leftMap(ValidationError.Decoding)
-            result <- formSessionInviteService.update(invite.withId(inviteId), companyUser.id)
+            invite <- req.req.attemptAs[SessionInvite[String]].leftWiden
+            result <- formSessionInviteService.update(invite.withId(inviteId), companyUser.id).leftWiden
           yield result
 
           action.value.flatMap {

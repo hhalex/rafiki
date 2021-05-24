@@ -3,6 +3,7 @@ package com.lion.rafiki.domain.company
 import cats.Monad
 import cats.data.EitherT
 import cats.implicits.{catsSyntaxOptionId, toTraverseOps}
+import cats.syntax.all._
 import com.lion.rafiki.domain.CompanyContract.Kind
 import com.lion.rafiki.domain.{
   Company,
@@ -91,7 +92,7 @@ object FormSession extends TaggedId[SessionId] {
   }
 
   trait Validation[F[_]] {
-    type Result[T] = EitherT[F, ValidationError, T]
+    type Result[T] = EitherT[F, ValidationError | RepoError, T]
     def canCreateSession(
         formId: Form.Id,
         companyId: Company.Id
@@ -113,21 +114,21 @@ object FormSession extends TaggedId[SessionId] {
       sessionInviteRepo: SessionInvite.Repo[F],
       companyContractRepo: CompanyContract.Repo[F]
   ) extends Validation[F] {
-    val success = EitherT.rightT[F, ValidationError](())
-    val contractFull = EitherT.leftT[F, CompanyContract.Record](
-      ValidationError.CompanyContractFull: ValidationError
+    val success: Result[Unit] = EitherT.rightT[F, ValidationError | RepoError](())
+    val contractFull: Result[CompanyContract.Record] = EitherT.leftT[F, CompanyContract.Record](
+      ValidationError.CompanyContractFull
     )
     override def canCreateSession(formId: Form.Id, companyId: Company.Id) = {
       val checkContractIdValid = (contract: CompanyContract.Record) =>
         contract.data.kind match {
-          case Kind.UnlimitedOpen => EitherT.rightT[F, ValidationError](contract)
+          case Kind.UnlimitedOpen => EitherT.rightT[F, ValidationError | RepoError](contract)
           case Kind.UnlimitedClosed => contractFull
           case Kind.Oneshot =>
             repo
               .getByCompanyContract(contract.id)
-              .leftMap[ValidationError](ValidationError.Repo)
+              .leftWiden
               .flatMap {
-                case Nil => EitherT.rightT[F, ValidationError](contract)
+                case Nil => EitherT.rightT[F, ValidationError | RepoError](contract)
                 case _   => contractFull
               }
         }
@@ -135,7 +136,7 @@ object FormSession extends TaggedId[SessionId] {
         _ <- formValidation.hasOwnership(formId, companyId.some)
         contracts <- companyContractRepo
           .getByCompany(companyId)
-          .leftMap(ValidationError.Repo)
+          .leftWiden
         validContract <- contracts match {
           case Nil => contractFull
           case hd :: tail =>
@@ -163,40 +164,41 @@ object FormSession extends TaggedId[SessionId] {
       for
         invites <- sessionInviteRepo
           .getByFormSession(formSession.id)
-          .leftMap[ValidationError](ValidationError.Repo)
-        _ <- countTeamMembers(invites.map(_.data.team))
+          .leftWiden
+        _ <- (countTeamMembers(invites.map(_.data.team))
           .filter(_._2 < 10)
           .keySet
           .toList match
             case Nil => EitherT.rightT(())
             case teams => EitherT.leftT(ValidationError.FormSessionTooFewTeamMembers(teams))
+          ).leftWiden
       yield (formSession, invites)
 
     override def stateAllowStart(formSession: Full) =
-      for
+      (for
         state <- EitherT.fromEither(formSession.data.state).leftMap[ValidationError](_ => ValidationError.FormSessionBrokenState)
         _ <- state match
           case State.Pending => EitherT.rightT(())
           case other => EitherT.leftT[F, ValidationError](ValidationError.FormSessionCantStart(other))
-      yield ()
+      yield ()).leftWiden
 
     override def stateAllowFinish(formSession: Full) =
-      for
+      (for
         state <- EitherT.fromEither(formSession.data.state).leftMap[ValidationError](_ => ValidationError.FormSessionBrokenState)
         _ <- state match
           case State.Started => EitherT.rightT(())
           case other => EitherT.leftT[F, ValidationError](ValidationError.FormSessionCantFinish(other))
-      yield ()
+      yield ()).leftWiden
 
     override def hasOwnership(id: Id, companyId: Company.Id) =
       for
-        formSession <- repo.get(id).leftMap(ValidationError.Repo)
+        formSession <- repo.get(id).leftWiden
         _ <- formValidation.hasOwnership(formSession.data.formId, companyId.some)
       yield formSession
   }
 
   class Service[F[_]: Monad](repo: Repo[F], validation: Validation[F], now: () => DateTime) {
-    type Result[T] = EitherT[F, ValidationError, T]
+    type Result[T] = EitherT[F, ValidationError | RepoError, T]
 
     def create(
         formSession: Create,
@@ -206,7 +208,7 @@ object FormSession extends TaggedId[SessionId] {
       contract <- validation.canCreateSession(formId, companyId)
       createdFormSession <- repo
         .create(formSession.copy(formId = formId), contract.id)
-        .leftMap[ValidationError](ValidationError.Repo)
+        .leftWiden
     yield createdFormSession
 
     def getById(formSessionId: Id, companyId: Company.Id): Result[Full] =
@@ -215,20 +217,20 @@ object FormSession extends TaggedId[SessionId] {
     def getByCompanyContract(
         companyId: CompanyContract.Id
     ): Result[List[Record]] =
-      repo.getByCompanyContract(companyId).leftMap(ValidationError.Repo)
+      repo.getByCompanyContract(companyId).leftWiden
 
     def delete(formSessionId: Id, companyId: Company.Id): Result[Unit] = for
       _ <- validation.hasOwnership(formSessionId, companyId)
       _ <- repo
         .delete(formSessionId)
-        .leftMap[ValidationError](ValidationError.Repo)
+        .leftWiden
     yield ()
 
     def update(formSession: Update, companyId: Company.Id): Result[Full] = for
       _ <- validation.hasOwnership(formSession.id, companyId)
       result <- repo
         .update(formSession)
-        .leftMap[ValidationError](ValidationError.Repo)
+        .leftWiden
     yield result
 
     def start(formSessionId: FormSession.Id, companyId: Company.Id): Result[Full] = for
@@ -237,7 +239,7 @@ object FormSession extends TaggedId[SessionId] {
       _ <- validation.checkTeamMembers(formSession)
       result <- repo
         .update(formSession.mapData(_.copy(startDate = now().some)))
-        .leftMap[ValidationError](ValidationError.Repo)
+        .leftWiden
     yield result
 
     def finish(formSessionId: FormSession.Id, companyId: Company.Id): Result[Full] = for
@@ -245,7 +247,7 @@ object FormSession extends TaggedId[SessionId] {
       _ <- validation.stateAllowFinish(formSession)
       result <- repo
         .update(formSession.mapData(_.copy(endDate = now().some)))
-        .leftMap[ValidationError](ValidationError.Repo)
+        .leftWiden
     yield result
 
     def listByCompany(
@@ -255,7 +257,7 @@ object FormSession extends TaggedId[SessionId] {
     ): Result[List[Record]] =
       repo
         .listByCompany(companyId, pageSize, offset)
-        .leftMap(ValidationError.Repo)
+        .leftWiden
 
   }
 }

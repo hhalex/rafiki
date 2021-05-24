@@ -61,19 +61,19 @@ object CompanyContract extends TaggedId[ContractId] {
     def hasOwnership(
         companyContractId: CompanyContract.Id,
         companyId: Option[Company.Id]
-    ): EitherT[F, ValidationError, Record]
+    ): EitherT[F, ValidationError | RepoError, Record]
   }
 
   class FromRepoValidation[F[_]: Monad](repo: Repo[F]) extends Validation[F] {
     val notAllowed = EitherT
       .leftT[F, Unit](ValidationError.NotAllowed)
-      .leftWiden[ValidationError]
+      .leftWiden[ValidationError | RepoError]
     override def hasOwnership(
         companyContractId: domain.CompanyContract.Id,
         companyId: Option[Company.Id]
-    ): EitherT[F, ValidationError, Record] = for
-      repoContract <- repo.get(companyContractId).leftMap(ValidationError.Repo)
-      success = EitherT.rightT[F, ValidationError](repoContract)
+    ): EitherT[F, ValidationError | RepoError, Record] = for
+      repoContract <- repo.get(companyContractId).leftWiden
+      success = EitherT.rightT[F, ValidationError | RepoError](repoContract)
       _ <- companyId match {
         case Some(id) if id == repoContract.data.company => success
         case Some(_)                                     => notAllowed
@@ -83,30 +83,30 @@ object CompanyContract extends TaggedId[ContractId] {
   }
 
   class Service[F[_]: Monad](companyContractRepo: Repo[F]) {
-    type Result[T] = EitherT[F, ValidationError, T]
+    type Result[T] = EitherT[F, ValidationError | RepoError, T]
     def create(companyContract: CreateRecord): Result[Record] =
       companyContractRepo
         .create(companyContract)
-        .leftMap[ValidationError](ValidationError.Repo)
+        .leftWiden
 
     def update(companyContract: Record): Result[Record] =
       companyContractRepo
         .update(companyContract)
-        .leftMap[ValidationError](ValidationError.Repo)
+        .leftWiden
 
     def get(id: Id): Result[Record] =
-      companyContractRepo.get(id).leftMap[ValidationError](ValidationError.Repo)
+      companyContractRepo.get(id).leftWiden
 
     def delete(id: Id): Result[Unit] =
       companyContractRepo
         .delete(id)
         .as(())
-        .leftMap[ValidationError](ValidationError.Repo)
+        .leftWiden
 
     def list(pageSize: Int, offset: Int): Result[List[Record]] =
       companyContractRepo
         .list(pageSize, offset)
-        .leftMap[ValidationError](ValidationError.Repo)
+        .leftWiden
 
     def listByCompany(
         companyId: Company.Id,
@@ -115,6 +115,6 @@ object CompanyContract extends TaggedId[ContractId] {
     ): Result[List[Record]] =
       companyContractRepo
         .listByCompany(companyId, pageSize, offset)
-        .leftMap[ValidationError](ValidationError.Repo)
+        .leftWiden
   }
 }

@@ -4,7 +4,7 @@ import cats.effect.Sync
 import cats.syntax.all._
 import cats.{Applicative, Monad}
 import cats.data.{EitherT, Kleisli, OptionT}
-import com.lion.rafiki.domain.{Company, User, ValidationError}
+import com.lion.rafiki.domain.{Company, User, ValidationError, RepoError}
 import org.http4s.dsl._
 import org.http4s.{AuthScheme, AuthedRequest, AuthedRoutes, Credentials, Request, Response, Status}
 import org.http4s.headers.Authorization
@@ -25,21 +25,21 @@ class HotUserStore[F[_]: Monad](hotUsers: Seq[UserCredentials], passwordHasher: 
 
   def isMember(u: User.Authed) = OptionT(hotUsersList.map(_.find(_._1 == u.email))).as(u)
 
-  def validateCredentials(creds: UserCredentials): EitherT[F, AuthError, User.Authed] = for
+  def validateCredentials(creds: UserCredentials): EitherT[F, AuthError | PasswordError, User.Authed] = for
     user <- EitherT.fromOptionF(hotUsersList.map(_.find(_._1 == creds.username)), AuthError.UserNotFound)
-    isValidPassword <- passwordHasher.checkPwd(creds.password, user._2).leftMap[AuthError](AuthError.Password)
-    _ <- EitherT.fromOption(if isValidPassword then user._1.some else None, AuthError.InvalidPassword: AuthError)
+    isValidPassword <- passwordHasher.checkPwd(creds.password, user._2).leftWiden
+    _ <- EitherT.fromOption(if isValidPassword then user._1.some else None, AuthError.InvalidPassword)
   yield User.Authed(user._1)
 }
 
 class UserAuth[F[_]: Sync](userService: User.Service[F], companyRepo: Company.Repo[F], hotUserStore: HotUserStore[F], crypto: CryptoBits) {
 
-  type Result[T] = EitherT[F, AuthError, T]
+  type Result[T] = EitherT[F, AuthError | PasswordError, T]
 
-  def validateCredentials(creds: UserCredentials): EitherT[F, ValidationError, User.Authed] =
-    hotUserStore.validateCredentials(creds).leftMap[ValidationError](ValidationError.Auth)
+  def validateCredentials(creds: UserCredentials): EitherT[F, AuthError | PasswordError | ValidationError | RepoError, User.Authed] =
+    hotUserStore.validateCredentials(creds).leftWiden
       .orElse(
-        userService.validateCredentials(creds.username, creds.password)
+        userService.validateCredentials(creds.username, creds.password).leftWiden
          .map(u => User.Authed(u.data.username))
       )
 
@@ -60,11 +60,11 @@ class UserAuth[F[_]: Sync](userService: User.Service[F], companyRepo: Company.Re
   }}
 
   private val resolveAdmin: Kleisli[Result, User.Authed, User.Authed] =
-    Kleisli { m => hotUserStore.isMember(m).toRight[AuthError](AuthError.AdminAuthError) }
+    Kleisli { m => hotUserStore.isMember(m).toRight[AuthError | PasswordError](AuthError.AdminAuthError) }
 
   private val resolveCompany: Kleisli[Result, User.Authed, Company.Record] =
     Kleisli { (authed: User.Authed) =>
-      companyRepo.getByUserEmail(authed.email).leftMap[AuthError](AuthError.CompanyAuthError)
+      companyRepo.getByUserEmail(authed.email).leftMap[AuthError | PasswordError](AuthError.CompanyAuthError)
     }
 
   val authCompany = AuthMiddleware[F, Company.Record](

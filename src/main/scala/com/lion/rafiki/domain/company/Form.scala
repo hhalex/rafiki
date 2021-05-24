@@ -52,19 +52,19 @@ object Form extends TaggedId[FormId] {
     def hasOwnership(
         formId: Form.Id,
         companyId: Option[Company.Id]
-    ): EitherT[F, ValidationError, Full]
+    ): EitherT[F, ValidationError | RepoError, Full]
   }
 
   class FromRepoValidation[F[_]: Monad](repo: Repo[F]) extends Validation[F] {
     val notAllowed = EitherT
       .leftT[F, Form.Full](ValidationError.NotAllowed)
-      .leftWiden[ValidationError]
+      .leftWiden[ValidationError | RepoError]
     override def hasOwnership(
         formId: Form.Id,
         companyId: Option[Company.Id]
-    ): EitherT[F, ValidationError, Full] = for
-      repoForm <- repo.get(formId).leftMap(ValidationError.Repo)
-      success = EitherT.rightT[F, ValidationError](repoForm)
+    ): EitherT[F, ValidationError | RepoError, Full] = for
+      repoForm <- repo.get(formId).leftWiden
+      success = EitherT.rightT[F, ValidationError | RepoError](repoForm)
       _ <- (companyId, repoForm.data.company) match {
         case (Some(id), Some(formOwnerId)) if id == formOwnerId => success
         case (None, _)                                          => success
@@ -78,7 +78,7 @@ object Form extends TaggedId[FormId] {
       inviteAnswerRepo: InviteAnswer.Repo[F],
       validation: Validation[F]
   ) {
-    type Result[T] = EitherT[F, ValidationError, T]
+    type Result[T] = EitherT[F, ValidationError | RepoError, T]
     def create(form: Create, companyId: Option[Company.Id]): Result[Full] =
       (for
         createdForm <- repo.create(form.copy(company = companyId))
@@ -87,18 +87,18 @@ object Form extends TaggedId[FormId] {
         _ <- createdForm.data.tree.traverse(t =>
           inviteAnswerRepo.overrideAnswerTable(answerTableName, FormTree.labels(t))
         )
-      yield createdForm).leftMap(ValidationError.Repo)
+      yield createdForm).leftWiden
 
     def getById(formId: Id, companyId: Option[Company.Id]): Result[Full] = for
       _ <- validation.hasOwnership(formId, companyId)
       repoForm <- repo
         .get(formId)
-        .leftMap[ValidationError](ValidationError.Repo)
+        .leftWiden
     yield repoForm
 
     def delete(formId: Id, companyId: Option[Company.Id]): Result[Unit] = for
       _ <- validation.hasOwnership(formId, companyId)
-      _ <- repo.delete(formId).leftMap[ValidationError](ValidationError.Repo)
+      _ <- repo.delete(formId).leftWiden
     yield ()
 
     def update(form: Update, companyId: Option[Company.Id]): Result[Full] =
@@ -106,14 +106,14 @@ object Form extends TaggedId[FormId] {
         formDB <- validation.hasOwnership(form.id, companyId)
         result <- repo
           .update(form.mapData(_.copy(company = formDB.data.company)))
-          .leftMap[ValidationError](ValidationError.Repo)
+          .leftWiden
         answerTableName = s"form${result.id}_answers"
           .asInstanceOf[InviteAnswer.TableName]
         _ <- result.data.tree
           .traverse(t =>
             inviteAnswerRepo.overrideAnswerTable(answerTableName, FormTree.labels(t))
           )
-          .leftMap(ValidationError.Repo)
+          .leftWiden
       yield result
 
     def listByCompany(
@@ -123,6 +123,6 @@ object Form extends TaggedId[FormId] {
     ): Result[List[Record]] =
       repo
         .listByCompany(companyId, pageSize, offset)
-        .leftMap(ValidationError.Repo)
+        .leftWiden
   }
 }

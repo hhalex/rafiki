@@ -1,8 +1,10 @@
 package com.lion.rafiki.domain
 
 import com.lion.rafiki.auth.{AuthError, PasswordError}
-import org.http4s.DecodeFailure
 import com.lion.rafiki.domain.company.FormSession
+import cats.data.EitherT
+import cats.syntax.all._
+import cats.Functor
 
 enum ValidationError:
   case UserCredentialsIncorrect
@@ -16,8 +18,3 @@ enum ValidationError:
   case FormSessionCantFinish(state: FormSession.State)
   case FormSessionTooFewTeamMembers(teams: List[String])
 
-  case Repo(e: RepoError)
-  case Decoding(e: DecodeFailure)
-  case Auth(e: AuthError)
-  case Password(e: PasswordError)
-end ValidationError

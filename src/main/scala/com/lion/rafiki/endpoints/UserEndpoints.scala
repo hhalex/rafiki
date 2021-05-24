@@ -17,8 +17,8 @@ class UserEndpoints[F[_]: Async] extends Http4sDsl[F] {
       AuthedRoutes.of[User.Authed, F] {
         case req @ PUT -> Root as _ =>
           val action = for
-            user <- req.req.attemptAs[User.Update].leftMap(ValidationError.Decoding)
-            result <- userService.update(user)
+            user <- req.req.attemptAs[User.Update].leftWiden
+            result <- userService.update(user).leftWiden
           yield result
 
           action.value.flatMap {

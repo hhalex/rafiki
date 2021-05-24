@@ -4,6 +4,8 @@ import cats.data.EitherT
 import cats.Monad
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
+import cats.syntax.all._
+import com.lion.rafiki.auth.PasswordError
 
 final case class Company[User](name: String, rh_user: User):
   def withId(id: Company.Id) = WithId(id, this)
@@ -39,31 +41,31 @@ object Company extends TaggedId[CompanyId] {
   }
 
   class Service[F[_]: Monad](companyRepo: Repo[F], userService: User.Service[F]) {
-    type Result[T] = EitherT[F, ValidationError, T]
-    def create(company: Create): Result[Full] =
+    type Result[T] = EitherT[F, ValidationError | RepoError, T]
+    def create(company: Create):  EitherT[F, ValidationError | RepoError | PasswordError, Full] =
       for
         createdUser <- userService.create(company.rh_user)
-        saved <- companyRepo.create(company.copy(rh_user = createdUser.id)).leftMap[ValidationError](ValidationError.Repo)
+        saved <- companyRepo.create(company.copy(rh_user = createdUser.id)).leftWiden
       yield saved.mapData(_.copy(rh_user = createdUser.data))
 
     def update(company: Update): Result[Full] =
       for
-        companyUserId <- companyRepo.get(company.id).map(_.data.rh_user).leftMap[ValidationError](ValidationError.Repo)
+        companyUserId <- companyRepo.get(company.id).map(_.data.rh_user).leftWiden
         updatedUser <- userService.update(company.data.rh_user.withId(companyUserId))
         fullCompany = company.mapData(_.copy(rh_user = updatedUser.id))
-        saved <- companyRepo.update(fullCompany).leftMap[ValidationError](ValidationError.Repo)
+        saved <- companyRepo.update(fullCompany).leftWiden
       yield saved.mapData(_.copy(rh_user = updatedUser.data))
 
     def get(id: Id): Result[Full] =
       for
-        company <- companyRepo.get(id).leftMap[ValidationError](ValidationError.Repo)
+        company <- companyRepo.get(id).leftWiden
         user <- userService.getById(company.data.rh_user)
       yield company.mapData(_.copy(rh_user = user.data))
 
-    def delete(id: Id): Result[Unit] = companyRepo.delete(id).leftMap[ValidationError](ValidationError.Repo)
+    def delete(id: Id): Result[Unit] = companyRepo.delete(id).leftWiden
 
-    def list(pageSize: Int, offset: Int): Result[List[Record]] = companyRepo.list(pageSize, offset).leftMap[ValidationError](ValidationError.Repo)
+    def list(pageSize: Int, offset: Int): Result[List[Record]] = companyRepo.list(pageSize, offset).leftWiden
 
-    def listWithUser(pageSize: Int, offset: Int): Result[List[Full]] = companyRepo.listWithUser(pageSize, offset).leftMap[ValidationError](ValidationError.Repo)
+    def listWithUser(pageSize: Int, offset: Int): Result[List[Full]] = companyRepo.listWithUser(pageSize, offset).leftWiden
   }
 }

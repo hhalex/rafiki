@@ -23,8 +23,8 @@ class CompanyEndpoints[F[_]: Async] extends Http4sDsl[F] {
         // Create company
         case req @ POST -> Root / CompanyRoute as _ =>
           val action = for
-            companyWithUser <- req.req.attemptAs[Company.Create].leftMap(ValidationError.Decoding)
-            result <- companyService.create(companyWithUser)
+            companyWithUser <- req.req.attemptAs[Company.Create].leftWiden
+            result <- companyService.create(companyWithUser).leftWiden
           yield result
 
           action.value.flatMap {
@@ -34,8 +34,8 @@ class CompanyEndpoints[F[_]: Async] extends Http4sDsl[F] {
         // Update company
         case req @ PUT -> Root / CompanyRoute / CompanyIdVar(id) as _ =>
           val action = for
-            company <- req.req.attemptAs[Company.Create].leftMap(ValidationError.Decoding)
-            result <- companyService.update(company.withId(id))
+            company <- req.req.attemptAs[Company.Create].leftWiden
+            result <- companyService.update(company.withId(id)).leftWiden
           yield result
 
           action.value.flatMap {
@@ -65,8 +65,8 @@ class CompanyEndpoints[F[_]: Async] extends Http4sDsl[F] {
         // Create company contract
         case req @ POST -> Root / CompanyRoute / CompanyIdVar(companyId) / CompanyContractRoute as _ =>
           val action = for
-            contract <- req.req.attemptAs[CompanyContract.CreateRecord].leftMap(ValidationError.Decoding)
-            result <- companyContractService.create(contract.copy(company = companyId))
+            contract <- req.req.attemptAs[CompanyContract.CreateRecord].leftWiden
+            result <- companyContractService.create(contract.copy(company = companyId)).leftWiden
           yield result
 
           action.value.flatMap {
@@ -76,8 +76,8 @@ class CompanyEndpoints[F[_]: Async] extends Http4sDsl[F] {
         // Update company contract
         case req @ PUT -> Root / CompanyRoute / CompanyIdVar(companyId) / CompanyContractRoute / CompanyContractIdVar(contractId) as _ =>
           val action = for
-            companyContract <- req.req.attemptAs[CompanyContract.CreateRecord].leftMap(ValidationError.Decoding)
-            result <- companyContractService.update(companyContract.copy(company = companyId).withId(contractId))
+            companyContract <- req.req.attemptAs[CompanyContract.CreateRecord].leftWiden
+            result <- companyContractService.update(companyContract.copy(company = companyId).withId(contractId)).leftWiden
           yield result
 
           action.value.flatMap {
