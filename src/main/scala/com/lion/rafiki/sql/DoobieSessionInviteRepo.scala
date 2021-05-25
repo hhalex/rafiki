@@ -49,6 +49,10 @@ private[sql] object SessionInviteSQL {
     (listFullInvitesFragment ++ fr"""WHERE form_session_id = $formSessionId""")
       .query[(FormSession.Id, SessionInvite.RecordWithEmail)]
 
+  def byUserEmailQ(email: String) =
+    (listFullInvitesFragment ++ fr"""WHERE email = $email""")
+      .query[(FormSession.Id, SessionInvite.RecordWithEmail)]
+
   def listBySessionQ(
       formSessionId: FormSession.Id,
       pageSize: Int,
@@ -103,6 +107,9 @@ class DoobieSessionInviteRepo[F[_]: TaglessMonadCancel](
       id: SessionInvite.Id
   ): Result[(FormSession.Id, SessionInvite.RecordWithEmail)] =
     byIdQ(id).option.toResult().transact(xa)
+
+  override def getByUserEmail(email: String): Result[List[(FormSession.Id, SessionInvite.RecordWithEmail)]] =
+    byUserEmailQ(email).to[List].toResult().transact(xa)
 
   override def getByFormSession(
       id: FormSession.Id

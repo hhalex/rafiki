@@ -59,7 +59,7 @@ object Company extends TaggedId[CompanyId] {
     def get(id: Id): Result[Full] =
       for
         company <- companyRepo.get(id).leftWiden
-        user <- userService.getById(company.data.rh_user)
+        user <- userService.getById(company.data.rh_user).leftWiden
       yield company.mapData(_.copy(rh_user = user.data))
 
     def delete(id: Id): Result[Unit] = companyRepo.delete(id).leftWiden

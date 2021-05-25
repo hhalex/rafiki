@@ -53,7 +53,7 @@ object User extends TaggedId[UserId] {
   }
 
   class Service[F[_]: Monad: Functor](repo: Repo[F], passwordHasher: PasswordHasher[F]) {
-    type Result[T] = EitherT[F, ValidationError | RepoError, T]
+    type Result[T] = EitherT[F, RepoError, T]
     def create(user: Create): EitherT[F, ValidationError | RepoError | PasswordError, Record] =
       for
         hashedPassword <- passwordHasher.hashPwd(user.password).leftWiden

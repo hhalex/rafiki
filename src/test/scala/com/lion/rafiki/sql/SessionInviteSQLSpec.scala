@@ -33,6 +33,7 @@ object SessionInviteSQLSpec extends Specification with IOChecker {
 
   check(byIdQ(formSessionInviteId))
   check(byFormSessionQ(formSessionId))
+  check(byUserEmailQ(""))
   check(insertQ(formSessionId, userId, "/", true.some))
   check(updateQ(formSessionInviteId, userId, "/", true.some))
   check(deleteQ(formSessionInviteId))

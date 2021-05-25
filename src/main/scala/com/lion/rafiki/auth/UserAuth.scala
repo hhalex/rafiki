@@ -4,7 +4,8 @@ import cats.effect.Sync
 import cats.syntax.all._
 import cats.{Applicative, Monad}
 import cats.data.{EitherT, Kleisli, OptionT}
-import com.lion.rafiki.domain.{Company, User, ValidationError, RepoError}
+import com.lion.rafiki.domain.company.SessionInvite
+import com.lion.rafiki.domain.{Company, RepoError, User, ValidationError}
 import org.http4s.dsl._
 import org.http4s.{AuthScheme, AuthedRequest, AuthedRoutes, Credentials, Request, Response, Status}
 import org.http4s.headers.Authorization
@@ -48,9 +49,9 @@ class UserAuth[F[_]: Sync](userService: User.Service[F], companyRepo: Company.Re
     r.putHeaders(Authorization(Credentials.Token(AuthScheme.Bearer, message)))
   }
 
-  def role(u: User.Authed): Result[String] =
-    resolveAdmin.as("Admin").run(u)
-      .orElse(resolveCompany.as("Company").run(u))
+  def role(u: User.Authed): Result[String] = resolveAdmin.as("Admin")(u)
+    .orElse(resolveCompany.as("Company")(u))
+    .orElse(resolveEmployee.as("Employee")(u))
 
   private val auth: Kleisli[Result, Request[F], User.Authed] = Kleisli { (request: Request[F]) => EitherT.fromEither[F] {
     for
@@ -67,11 +68,19 @@ class UserAuth[F[_]: Sync](userService: User.Service[F], companyRepo: Company.Re
       companyRepo.getByUserEmail(authed.email).leftMap[AuthError | PasswordError](AuthError.CompanyAuthError)
     }
 
+  private val resolveEmployee: Kleisli[Result, User.Authed, User.Id] =
+    Kleisli { (authed: User.Authed) =>
+      userService.getByName(authed.email).leftMap[AuthError | PasswordError](AuthError.EmployeeAuthError).map(_.id)
+    }
+
   val authCompany = AuthMiddleware[F, Company.Record](
     Kleisli { (r: Request[F]) => (auth andThen resolveCompany).run(r).toOption }
   )
   val authAdmin = AuthMiddleware[F, User.Authed](
     Kleisli { (r: Request[F]) => (auth andThen resolveAdmin).run(r).toOption }
+  )
+  val authEmployee = AuthMiddleware[F, User.Id](
+    Kleisli { (r: Request[F]) => (auth andThen resolveEmployee).run(r).toOption }
   )
 }
 

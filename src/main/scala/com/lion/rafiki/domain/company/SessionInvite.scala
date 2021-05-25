@@ -37,6 +37,7 @@ object SessionInvite extends TaggedId[InviteId] {
     def create(sessionInvite: CreateRecord, formSessionId: FormSession.Id): Result[Record]
     def update(sessionInvite: UpdateRecord): Result[Record]
     def get(id: Id): Result[(FormSession.Id, RecordWithEmail)]
+    def getByUserEmail(email: String): Result[List[(FormSession.Id, RecordWithEmail)]]
     def getByFormSession(id: FormSession.Id): Result[List[RecordWithEmail]]
     def delete(id: Id): Result[Unit]
     def list(pageSize: Int, offset: Int): Result[List[(FormSession.Id, SessionInvite.RecordWithEmail)]]
