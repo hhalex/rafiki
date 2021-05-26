@@ -34,6 +34,8 @@ lazy val root = (project in file("."))
         ExclusionRule(organization = "org.scala-lang.modules")
       ), // Specs2 support for typechecking statements.
       ("org.specs2"          %% "specs2-core"         % Specs2Version % "test").cross(CrossVersion.for3Use2_13),
+      ("org.specs2"          %% "specs2-mock"         % Specs2Version % "test").cross(CrossVersion.for3Use2_13),
+      "org.typelevel" %% "cats-effect-testing-specs2" % "1.1.1" % Test,
       "ch.qos.logback"      %  "logback-classic"     % LogbackVersion
     ),
     watchSources ++= (baseDirectory.value / "public/ui" ** "*").get,

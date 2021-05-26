@@ -65,12 +65,6 @@ object User extends TaggedId[UserId] {
 
     def getByName(email: String): Result[Full] = repo.findByUserName(email).leftWiden
 
-    def validateCredentials(email: String, password: String): EitherT[F, ValidationError | RepoError | PasswordError, Record] = for
-      user <- repo.findByUserName(email).leftWiden
-      isValidPassword <- passwordHasher.checkPwd(password, user.data.password).leftWiden[ValidationError | RepoError | PasswordError]
-      _ <- (if isValidPassword then EitherT.rightT[F, ValidationError](()) else EitherT.leftT[F, Unit](ValidationError.UserCredentialsIncorrect)).leftWiden
-    yield user
-
     def delete(userId: Id): F[Unit] =
       repo.delete(userId).value.void
 

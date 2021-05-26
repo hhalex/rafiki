@@ -12,7 +12,7 @@ trait PasswordHasher[F[_]] {
 }
 
 object PasswordHasher {
-  opaque type Password = String
+  opaque type Password <: String = String
   val tag: String => Password = _.asInstanceOf[Password]
 
   import com.github.t3hnar.bcrypt._

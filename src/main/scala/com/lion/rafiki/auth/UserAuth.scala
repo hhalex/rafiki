@@ -33,16 +33,19 @@ class HotUserStore[F[_]: Monad](hotUsers: Seq[UserCredentials], passwordHasher: 
   yield User.Authed(user._1)
 }
 
-class UserAuth[F[_]: Sync](userService: User.Service[F], companyRepo: Company.Repo[F], hotUserStore: HotUserStore[F], crypto: CryptoBits) {
+class UserAuth[F[_]: Sync](userRepo: User.Repo[F], companyRepo: Company.Repo[F], hotUserStore: HotUserStore[F], crypto: CryptoBits, passwordHasher: PasswordHasher[F]) {
 
   type Result[T] = EitherT[F, AuthError | PasswordError, T]
 
-  def validateCredentials(creds: UserCredentials): EitherT[F, AuthError | PasswordError | ValidationError | RepoError, User.Authed] =
-    hotUserStore.validateCredentials(creds).leftWiden
-      .orElse(
-        userService.validateCredentials(creds.username, creds.password).leftWiden
-         .map(u => User.Authed(u.data.username))
-      )
+  def validateCredentials(creds: UserCredentials): EitherT[F, AuthError | PasswordError | RepoError, User.Authed] =
+    hotUserStore.validateCredentials(creds).leftFlatMap({
+      case AuthError.UserNotFound => for
+          user <- userRepo.findByUserName(creds.username).leftWiden
+          isValidPassword <- passwordHasher.checkPwd(creds.password, user.data.password).leftWiden[RepoError | PasswordError]
+          _ <- (if isValidPassword then EitherT.rightT[F, AuthError](()) else EitherT.leftT[F, Unit](AuthError.InvalidPassword)).leftWiden
+        yield User.Authed(user.data.username)
+      case err => EitherT.leftT[F, User.Authed](err)
+    })
 
   def embedAuthHeader(r: Response[F], u: User.Authed, time: String): Response[F] = {
     val message = crypto.signToken(u.email, time)
@@ -53,7 +56,7 @@ class UserAuth[F[_]: Sync](userService: User.Service[F], companyRepo: Company.Re
     .orElse(resolveCompany.as("Company")(u))
     .orElse(resolveEmployee.as("Employee")(u))
 
-  private val auth: Kleisli[Result, Request[F], User.Authed] = Kleisli { (request: Request[F]) => EitherT.fromEither[F] {
+  private[auth] val auth: Kleisli[Result, Request[F], User.Authed] = Kleisli { (request: Request[F]) => EitherT.fromEither[F] {
     for
       header <- request.headers.get[Authorization].toRight[AuthError](AuthError.AuthorizationTokenNotFound)
       userEmail <- crypto.validateSignedToken(header.credentials.asInstanceOf[Credentials.Token].token).toRight[AuthError](AuthError.InvalidToken)
@@ -70,7 +73,7 @@ class UserAuth[F[_]: Sync](userService: User.Service[F], companyRepo: Company.Re
 
   private val resolveEmployee: Kleisli[Result, User.Authed, User.Id] =
     Kleisli { (authed: User.Authed) =>
-      userService.getByName(authed.email).leftMap[AuthError | PasswordError](AuthError.EmployeeAuthError).map(_.id)
+      userRepo.findByUserName(authed.email).leftMap[AuthError | PasswordError](AuthError.EmployeeAuthError).map(_.id)
     }
 
   val authCompany = AuthMiddleware[F, Company.Record](

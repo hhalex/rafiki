@@ -109,7 +109,7 @@ object Main extends IOApp {
         val hotUserStore =
           new HotUserStore[IO](conf.hotUsersList, passwordHasher)
         val userAuth =
-          new UserAuth[IO](userService, companyRepo, hotUserStore, crypto)
+          new UserAuth[IO](userRepo, companyRepo, hotUserStore, crypto, passwordHasher)
 
         val authEndpoints =
           new AuthenticationEndpoints[IO]().endpoints(userAuth, clock)
