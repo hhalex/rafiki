@@ -1,9 +1,9 @@
 import sbt.ExclusionRule
 
-val Http4sVersion = "1.0.0-M22"
+val Http4sVersion = "1.0.0-M23"
 val CatsVersion = "2.6.1"
-val CirceVersion = "0.14.0-M7"
-val DoobieVersion = "1.0.0-M4"
+val CirceVersion = "0.14.1"
+val DoobieVersion = "1.0.0-M5"
 val Specs2Version = "4.11.0"
 val LogbackVersion = "1.2.3"
 
