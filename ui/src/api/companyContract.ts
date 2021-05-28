@@ -1,4 +1,4 @@
-import { AuthenticatedFetch } from "../atoms/Auth";
+import { AuthAxios } from "../auth";
 import { WithId } from "./WithId";
 
 export type CompanyContract<Company> = {
@@ -16,16 +16,16 @@ export namespace CompanyContract {
     export type Update = WithId<Create>;
     export type Full = WithId<CompanyContract<string>>
 
-    export const createApi = (authFetch: AuthenticatedFetch) => ({
+    export const createApi = (authFetch: AuthAxios) => ({
         create: (companyContract: Create) =>
-            authFetch.post(`/api/company/${companyContract.company}/contract`, JSON.stringify(companyContract)).then<Full>(b => b.json()),
+            authFetch.post<Full>(`/company/${companyContract.company}/contract`, companyContract).then(b => b.data),
         update: (companyContract: Update) =>
-            authFetch.put(`/api/company/${companyContract.company}/contract/${companyContract.id}`, JSON.stringify(companyContract)).then<Full>(b => b.json()),
+            authFetch.put<Full>(`/company/${companyContract.company}/contract/${companyContract.id}`, companyContract).then(b => b.data),
         delete: ({ company, id }: Update) =>
-            authFetch.delete(`/api/company/${company}/contract/${id}`),
-        listByCompany: (companyId: string, pageSize?: number, offset?: number) => 
-            authFetch.get(`/api/company/${companyId}/contract`).then<Full[]>(b => b.json()),
-        list: (companyId: string, pageSize?: number, offset?: number) => 
-            authFetch.get(`/api/company/${companyId}/contract`).then<Full[]>(b => b.json()),
+            authFetch.delete<void>(`/company/${company}/contract/${id}`),
+        listByCompany: (companyId: string, pageSize?: number, offset?: number) =>
+            authFetch.get<Full[]>(`/company/${companyId}/contract`).then(b => b.data),
+        list: (companyId: string, pageSize?: number, offset?: number) =>
+            authFetch.get<Full[]>(`/company/${companyId}/contract`).then(b => b.data),
     });
 }

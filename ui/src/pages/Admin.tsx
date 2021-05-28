@@ -7,8 +7,8 @@ import { TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Fab, 
 import { Link, NavLink, Route, Switch, useLocation, useRouteMatch } from "react-router-dom";
 import EditIcon from '@material-ui/icons/Edit';
 import DeleteIcon from '@material-ui/icons/Delete';
-import { AuthenticatedFetch } from '../atoms/Auth';
 import { Company } from '../api/company';
+import type { AuthAxios } from '../auth';
 
 const useStyles = makeStyles((theme: Theme) => ({
   root: {
@@ -50,7 +50,7 @@ const NavTab = ({to, label}: {to: string, label: string}) => {
 };
 
 
-export default function AdminView({authFetch}: {authFetch: AuthenticatedFetch}) {
+export default function AdminView({authFetch}: {authFetch: AuthAxios}) {
   const classes = useStyles();
   const { path, url } = useRouteMatch();
   return (
@@ -76,13 +76,13 @@ export default function AdminView({authFetch}: {authFetch: AuthenticatedFetch}) 
               <CompanyCRUD authFetch={authFetch} />
             </Route>
             <Route path={`${path}/employees`}>
-              Employés <hr style={{ width: "250px" }} /> 
+              Employés <hr style={{ width: "250px" }} />
             </Route>
             <Route path={`${path}/doctors`}>
-              Médecins <hr style={{ width: "250px" }} /> 
+              Médecins <hr style={{ width: "250px" }} />
             </Route>
             <Route path={`${path}/bills`}>
-              Factures <hr style={{ width: "250px" }} /> 
+              Factures <hr style={{ width: "250px" }} />
             </Route>
             <Route path={path}>
               Welcome to the admin page
@@ -109,7 +109,7 @@ const useStylesCRUD = makeStyles({
   }
 });
 
-const CompanyCRUD = ({authFetch}: {authFetch: AuthenticatedFetch}) => {
+const CompanyCRUD = ({authFetch}: {authFetch: AuthAxios}) => {
   const classes = useStylesCRUD();
 
   const api = Company.createApi(authFetch);
@@ -145,7 +145,6 @@ const CompanyCRUD = ({authFetch}: {authFetch: AuthenticatedFetch}) => {
 
   const editOrAddCompany = (c: CompanyFormData) => {
     const emptyPromise = new Promise<void>(_ => {});
-    
     if (c.name && c.rh_user_email && c.rh_user_password !== undefined) {
 
       const data = {

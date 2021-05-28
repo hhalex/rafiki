@@ -3,13 +3,13 @@ import { makeStyles, Theme } from '@material-ui/core/styles';
 import Tabs from '@material-ui/core/Tabs';
 import Tab from '@material-ui/core/Tab';
 import { Link, Route, Switch, useLocation, useRouteMatch } from "react-router-dom";
-import { AuthenticatedFetch } from '../atoms/Auth';
 import { Typography } from '@material-ui/core';
 import { FormCRUD } from '../components/company/FormEditor';
 import { Form } from '../api/company/form';
 import { FormSessionCRUD } from '../components/company/FormSessionEditor';
 import { FormSession } from '../api/company/session';
 import { FormSessionInvite } from '../api/company/invite';
+import { AuthAxios } from '../auth';
 
 const useStyles = makeStyles((theme: Theme) => ({
   root: {
@@ -50,8 +50,7 @@ const NavTab = ({to, label}: {to: string, label: string}) => {
   return <Link to={`${url}${to}`} ><Tab label={label} selected={selected} /></Link>
 };
 
-
-export default function CompanyView({authFetch}: {authFetch: AuthenticatedFetch}) {
+export default function CompanyView({authFetch}: {authFetch: AuthAxios}) {
   const classes = useStyles();
   const { path, url } = useRouteMatch();
 

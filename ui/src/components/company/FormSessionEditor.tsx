@@ -72,7 +72,7 @@ const FormOverview = ({ apiSession }: { apiSession: ReturnType<typeof FormSessio
         : SessionState.FINISHED;
 
   return <List className={classes.table}>
-    {list.flatMap(formcSession => {
+    {list.flatMap(formSession => {
       const sState = sessionState(formSession);
       return [
       <Divider key={`divider-${formSession.id}`} />,

@@ -1,4 +1,4 @@
-import { AuthenticatedFetch } from "../../atoms/Auth";
+import { AuthAxios } from "../../auth";
 import { WithId } from "../WithId";
 
 export type FormSessionInvite = {
@@ -12,14 +12,14 @@ export namespace FormSessionInvite {
     export type Update = WithId<FormSessionInvite>;
     export type Full = WithId<FormSessionInvite>
 
-    export const createApi = (authFetch: AuthenticatedFetch) => ({
+    export const createApi = (authFetch: AuthAxios) => ({
         create: (formSessionInvite: Create, formSessionId: string): Promise<Full> =>
-            authFetch.post(`/api/company/session/${formSessionId}/invite`, JSON.stringify(formSessionInvite)).then<Full>(b => b.json()),
+            authFetch.post<Full>(`/company/session/${formSessionId}/invite`, formSessionInvite).then(b => b.data),
         update: (formSessionInvite: Update) =>
-            authFetch.put(`/api/company/invite/${formSessionInvite.id}`, JSON.stringify(formSessionInvite)).then<Full>(b => b.json()),
-        delete: (formSessionInviteId: string) => authFetch.delete(`/api/company/invite/${formSessionInviteId}`).then(_ => {}),
-        listByFormSession: (formSessionId: string, pageSize?: number, offset?: number) => 
-            authFetch.get(`/api/company/session/${formSessionId}/invite`).then<Full[]>(b => b.json()),
-        getById: (formSessionInviteId: string) => authFetch.get(`/api/company/invite/${formSessionInviteId}`).then<Full>(b => b.json()),
+            authFetch.put<Full>(`/company/invite/${formSessionInvite.id}`, formSessionInvite).then(b => b.data),
+        delete: (formSessionInviteId: string) => authFetch.delete<void>(`/company/invite/${formSessionInviteId}`),
+        listByFormSession: (formSessionId: string, pageSize?: number, offset?: number) =>
+            authFetch.get<Full[]>(`/company/session/${formSessionId}/invite`).then(b => b.data),
+        getById: (formSessionInviteId: string) => authFetch.get<Full>(`/company/invite/${formSessionInviteId}`).then(b => b.data),
     });
 };

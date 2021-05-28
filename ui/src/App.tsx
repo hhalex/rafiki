@@ -1,6 +1,7 @@
 import React from "react";
 import { BrowserRouter, Redirect, Route, Switch } from "react-router-dom";
-import { AuthenticatedFetch, AuthProvider, Role } from "./atoms/Auth";
+import { AuthAxios, Role } from "./auth";
+import { AuthProvider } from "./AuthProvider";
 import Admin from "./pages/Admin";
 import Company from "./pages/Company";
 
@@ -10,21 +11,21 @@ export const App = () => {
         <Switch>
             <Route path="/admin">
                 <AuthProvider>{
-                    ({authFetch}: {authFetch: AuthenticatedFetch}) => authFetch.role === Role.Admin
+                    ({authFetch}: {authFetch: AuthAxios}) => authFetch.role === Role.Admin
                         ? <Admin authFetch={authFetch}/>
                         : <Redirect to={`/${authFetch.role.toLowerCase()}`} />
                 }</AuthProvider>
             </Route>
             <Route path="/company">
                 <AuthProvider>{
-                    ({authFetch}: {authFetch: AuthenticatedFetch}) => authFetch.role === Role.Company
+                    ({authFetch}: {authFetch: AuthAxios}) => authFetch.role === Role.Company
                         ? <Company authFetch={authFetch}/>
                         : <Redirect to={`/${authFetch.role.toLowerCase()}`} />
                 }</AuthProvider>
             </Route>
             <Route path="/">
                 <AuthProvider>{
-                    ({authFetch}: {authFetch: AuthenticatedFetch}) => 
+                    ({authFetch}: {authFetch: AuthAxios}) =>
                         <Redirect to={`/${authFetch.role.toLowerCase()}`} />
                 }</AuthProvider>
             </Route>

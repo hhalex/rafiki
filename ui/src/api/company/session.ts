@@ -1,4 +1,4 @@
-import { AuthenticatedFetch } from "../../atoms/Auth";
+import { AuthAxios } from "../../auth";
 import { WithId } from "../WithId";
 
 export type FormSession = {
@@ -15,18 +15,18 @@ export namespace FormSession {
     export type Update = WithId<FormSession>;
     export type Full = WithId<FormSession>
 
-    export const createApi = (authFetch: AuthenticatedFetch) => ({
+    export const createApi = (authFetch: AuthAxios) => ({
         create: (formSession: Create, formId: string): Promise<Full> =>
-            authFetch.post(`/api/company/form/${formId}/session`, JSON.stringify(formSession)).then<Full>(b => b.json()),
+            authFetch.post<Full>(`/company/form/${formId}/session`, formSession).then(b => b.data),
         start: (formSessionId: string) =>
-            authFetch.put(`/api/company/session/${formSessionId}/start`).then<Full>(b => b.json()),
+            authFetch.put<Full>(`/company/session/${formSessionId}/start`).then(b => b.data),
         finish: (formSessionId: string) =>
-            authFetch.put(`/api/company/session/${formSessionId}/finish`).then<Full>(b => b.json()),
+            authFetch.put<Full>(`/company/session/${formSessionId}/finish`).then(b => b.data),
         update: (formSession: Update) =>
-            authFetch.put(`/api/company/session/${formSession.id}`, JSON.stringify(formSession)).then<Full>(b => b.json()),
-        delete: (formSessionId: string) => authFetch.delete(`/api/company/session/${formSessionId}`).then(_ => {}),
+            authFetch.put<Full>(`/company/session/${formSession.id}`, formSession).then(b => b.data),
+        delete: (formSessionId: string) => authFetch.delete(`/company/session/${formSessionId}`),
         list: (pageSize?: number, offset?: number) =>
-            authFetch.get(`/api/company/session`).then<Full[]>(b => b.json()),
-        getById: (formId: string) => authFetch.get(`/api/company/session/${formId}`).then<Full>(b => b.json()),
+            authFetch.get<Full[]>(`/company/session`).then(b => b.data),
+        getById: (formId: string) => authFetch.get(`/company/session/${formId}`).then(b => b.data),
     });
 };

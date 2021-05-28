@@ -1,4 +1,4 @@
-import { AuthenticatedFetch } from "../../atoms/Auth";
+import { AuthAxios } from "../../auth";
 import { WithId } from "../WithId";
 
 export type Form<Tree> = {
@@ -28,14 +28,14 @@ export namespace Form {
     export type Update = WithId<Form<Tree>>;
     export type Full = WithId<Form<Tree>>
 
-    export const createApi = (authFetch: AuthenticatedFetch) => ({
+    export const createApi = (authFetch: AuthAxios) => ({
         create: (form: Create): Promise<Full> =>
-            authFetch.post("/api/company/form", JSON.stringify(form)).then<Full>(b => b.json()),
+            authFetch.post<Full>("/company/form", form).then(b => b.data),
         update: (form: Update) =>
-            authFetch.put(`/api/company/form/${form.id}`, JSON.stringify(form)).then<Full>(b => b.json()),
-        delete: (formId: string) => authFetch.delete(`/api/company/form/${formId}`).then(_ => {}),
-        list: (pageSize?: number, offset?: number) => 
-            authFetch.get(`/api/company/form`).then<Full[]>(b => b.json()),
-        getById: (formId: string) => authFetch.get(`/api/company/form/${formId}`).then<Full>(b => b.json()),
+            authFetch.put<Full>(`/company/form/${form.id}`, form).then(b => b.data),
+        delete: (formId: string) => authFetch.delete<void>(`/company/form/${formId}`),
+        list: (pageSize?: number, offset?: number) =>
+            authFetch.get<Full[]>(`/company/form`).then(b => b.data),
+        getById: (formId: string) => authFetch.get<Full>(`/company/form/${formId}`).then(b => b.data),
     });
 };
