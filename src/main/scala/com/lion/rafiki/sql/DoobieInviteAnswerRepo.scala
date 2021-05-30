@@ -22,15 +22,13 @@ private[sql] object InviteAnswerSQL {
     val labelsSql = labels
       .map { _.replace("-", "_") }
       .map { label =>
-        s"${label}_numeric integer, ${label}_freetext text"
-      }
-      .toList
-      .intercalate(", ")
+        s", ${label}_numeric integer, ${label}_freetext text"
+      }.mkString
 
     val query = s"""
     DROP TABLE IF EXISTS $name;
     CREATE TABLE $name (
-        invite bigint PRIMARY KEY references form_session_invites(id),
+        invite bigint PRIMARY KEY references form_session_invites(id)
         $labelsSql
     )"""
 

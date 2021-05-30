@@ -91,9 +91,7 @@ object Form extends TaggedId[FormId] {
 
     def getById(formId: Id, companyId: Option[Company.Id]): Result[Full] = for
       _ <- validation.hasOwnership(formId, companyId)
-      repoForm <- repo
-        .get(formId)
-        .leftWiden
+      repoForm <- repo.get(formId).leftWiden
     yield repoForm
 
     def delete(formId: Id, companyId: Option[Company.Id]): Result[Unit] = for
