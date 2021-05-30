@@ -15,18 +15,20 @@ export namespace FormSession {
     export type Update = WithId<FormSession>;
     export type Full = WithId<FormSession>
 
+    export type Api = ReturnType<typeof createApi>
+
     export const createApi = (authFetch: AuthAxios) => ({
         create: (formSession: Create, formId: string): Promise<Full> =>
-            authFetch.post<Full>(`/company/form/${formId}/session`, formSession).then(b => b.data),
+            authFetch.post<Full>(`/company/form/${formId}/session`, formSession),
         start: (formSessionId: string) =>
-            authFetch.put<Full>(`/company/session/${formSessionId}/start`).then(b => b.data),
+            authFetch.put<Full>(`/company/session/${formSessionId}/start`),
         finish: (formSessionId: string) =>
-            authFetch.put<Full>(`/company/session/${formSessionId}/finish`).then(b => b.data),
+            authFetch.put<Full>(`/company/session/${formSessionId}/finish`),
         update: (formSession: Update) =>
-            authFetch.put<Full>(`/company/session/${formSession.id}`, formSession).then(b => b.data),
+            authFetch.put<Full>(`/company/session/${formSession.id}`, formSession),
         delete: (formSessionId: string) => authFetch.delete(`/company/session/${formSessionId}`),
         list: (pageSize?: number, offset?: number) =>
-            authFetch.get<Full[]>(`/company/session`).then(b => b.data),
-        getById: (formId: string) => authFetch.get(`/company/session/${formId}`).then(b => b.data),
+            authFetch.get<Full[]>(`/company/session`),
+        getById: (formId: string) => authFetch.get<Full>(`/company/session/${formId}`),
     });
 };

@@ -28,14 +28,16 @@ export namespace Form {
     export type Update = WithId<Form<Tree>>;
     export type Full = WithId<Form<Tree>>
 
+    export type Api = ReturnType<typeof createApi>
+
     export const createApi = (authFetch: AuthAxios) => ({
         create: (form: Create): Promise<Full> =>
-            authFetch.post<Full>("/company/form", form).then(b => b.data),
+            authFetch.post<Full>("/company/form", form),
         update: (form: Update) =>
-            authFetch.put<Full>(`/company/form/${form.id}`, form).then(b => b.data),
+            authFetch.put<Full>(`/company/form/${form.id}`, form),
         delete: (formId: string) => authFetch.delete<void>(`/company/form/${formId}`),
         list: (pageSize?: number, offset?: number) =>
-            authFetch.get<Full[]>(`/company/form`).then(b => b.data),
-        getById: (formId: string) => authFetch.get<Full>(`/company/form/${formId}`).then(b => b.data),
+            authFetch.get<Full[]>(`/company/form`),
+        getById: (formId: string) => authFetch.get<Full>(`/company/form/${formId}`),
     });
 };

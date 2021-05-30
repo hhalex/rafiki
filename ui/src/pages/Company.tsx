@@ -30,7 +30,6 @@ const useStyles = makeStyles((theme: Theme) => ({
     justifyContent: "center"
   },
   body: {
-    height: "60vh",
     display: 'flex',
     flexGrow: 1,
 

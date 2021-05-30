@@ -18,14 +18,14 @@ export namespace CompanyContract {
 
     export const createApi = (authFetch: AuthAxios) => ({
         create: (companyContract: Create) =>
-            authFetch.post<Full>(`/company/${companyContract.company}/contract`, companyContract).then(b => b.data),
+            authFetch.post<Full>(`/company/${companyContract.company}/contract`, companyContract),
         update: (companyContract: Update) =>
-            authFetch.put<Full>(`/company/${companyContract.company}/contract/${companyContract.id}`, companyContract).then(b => b.data),
+            authFetch.put<Full>(`/company/${companyContract.company}/contract/${companyContract.id}`, companyContract),
         delete: ({ company, id }: Update) =>
             authFetch.delete<void>(`/company/${company}/contract/${id}`),
         listByCompany: (companyId: string, pageSize?: number, offset?: number) =>
-            authFetch.get<Full[]>(`/company/${companyId}/contract`).then(b => b.data),
+            authFetch.get<Full[]>(`/company/${companyId}/contract`),
         list: (companyId: string, pageSize?: number, offset?: number) =>
-            authFetch.get<Full[]>(`/company/${companyId}/contract`).then(b => b.data),
+            authFetch.get<Full[]>(`/company/${companyId}/contract`),
     });
 }

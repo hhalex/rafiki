@@ -19,7 +19,7 @@ type EditorData = {
   tree?: Form.Tree.QuestionGroup & { id?: string },
 };
 
-type APIProps = { api: ReturnType<typeof Form.createApi> }
+type APIProps = { api: Form.Api }
 
 export const FormCRUD = ({ api }: APIProps) => {
   const { path, url } = useRouteMatch();
@@ -32,7 +32,7 @@ export const FormCRUD = ({ api }: APIProps) => {
       <Route path={`${path}/new`}>
         <ValidatedForm
           initialValues={{}}
-          submit={(data: Form.Create) => api.create(data).catch(() => { })}
+          submit={(data: Form.Create) => api.create(data)}
           back={backHome}
         />
       </Route>
@@ -53,7 +53,7 @@ const FormOverview = ({ api }: APIProps) => {
 
   const listEntries = () => api.list().then(setList);
   const deleteEntry = (formId: string) =>
-    api.delete(formId).then(listEntries).catch(() => { });
+    api.delete(formId).then(listEntries);
 
   useEffect(listEntries as any, []);
 
@@ -93,7 +93,7 @@ const FormEdit = ({ api, back }: APIProps & { back: () => void }) => {
   return data
     ? <ValidatedForm
       initialValues={data as EditorData}
-      submit={(data: Form.Update) => api.update(data).catch(() => { })}
+      submit={(data: Form.Update) => api.update(data)}
       back={back}
     />
     : <div>Loading</div>

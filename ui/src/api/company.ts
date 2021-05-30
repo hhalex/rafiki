@@ -17,13 +17,13 @@ export namespace Company {
          * @returns The newly created company and its user.
          */
         create: (company: Create): Promise<Full> =>
-            authFetch.post<Full>("/admin/company", company).then(b => b.data),
+            authFetch.post<Full>("/admin/company", company),
         /**
          * @param company Data describing the company with its user data.
          * @returns The updated company and its updated user.
          */
         update: (company: Update) =>
-            authFetch.put<Full>(`/admin/company/${company.id}`, company).then(b => b.data),
+            authFetch.put<Full>(`/admin/company/${company.id}`, company),
         /**
          * Delete a company instance and its associated user.
          * @param companyId Company Id.
@@ -36,12 +36,12 @@ export namespace Company {
          * @returns The companies from `offset` to `offset + pageSize`.
          */
         list: (pageSize?: number, offset?: number) =>
-            authFetch.get<Full[]>(`/admin/company`).then<Full[]>(b => b.data),
+            authFetch.get<Full[]>(`/admin/company`),
         /**
          * @param companyId Company Id.
          * @returns The company matching `companyId`.
          */
-        getById: (companyId: string) => authFetch.get<Full>(`/admin/company/${companyId}`).then(b => b.data),
+        getById: (companyId: string) => authFetch.get<Full>(`/admin/company/${companyId}`),
 
     });
 };

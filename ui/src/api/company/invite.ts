@@ -12,14 +12,16 @@ export namespace FormSessionInvite {
     export type Update = WithId<FormSessionInvite>;
     export type Full = WithId<FormSessionInvite>
 
+    export type Api = ReturnType<typeof createApi>
+
     export const createApi = (authFetch: AuthAxios) => ({
         create: (formSessionInvite: Create, formSessionId: string): Promise<Full> =>
-            authFetch.post<Full>(`/company/session/${formSessionId}/invite`, formSessionInvite).then(b => b.data),
+            authFetch.post<Full>(`/company/session/${formSessionId}/invite`, formSessionInvite),
         update: (formSessionInvite: Update) =>
-            authFetch.put<Full>(`/company/invite/${formSessionInvite.id}`, formSessionInvite).then(b => b.data),
+            authFetch.put<Full>(`/company/invite/${formSessionInvite.id}`, formSessionInvite),
         delete: (formSessionInviteId: string) => authFetch.delete<void>(`/company/invite/${formSessionInviteId}`),
         listByFormSession: (formSessionId: string, pageSize?: number, offset?: number) =>
-            authFetch.get<Full[]>(`/company/session/${formSessionId}/invite`).then(b => b.data),
-        getById: (formSessionInviteId: string) => authFetch.get<Full>(`/company/invite/${formSessionInviteId}`).then(b => b.data),
+            authFetch.get<Full[]>(`/company/session/${formSessionId}/invite`),
+        getById: (formSessionInviteId: string) => authFetch.get<Full>(`/company/invite/${formSessionInviteId}`),
     });
 };

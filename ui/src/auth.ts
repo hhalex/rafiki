@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosInstance, AxiosResponse } from "axios";
 import { atom, SetterOrUpdater } from "recoil";
 
 export type User = {
@@ -26,7 +26,13 @@ export namespace Role {
     }
 }
 
-export type AuthAxios = AxiosInstance & { role: Role };
+export type AuthAxios = {
+    get: <T>(url: string) => Promise<T>,
+    post: <T>(url: string, body?: any) => Promise<T>,
+    put: <T>(url: string, body?: any) => Promise<T>,
+    delete: <T>(url: string) => Promise<T>,
+    role: Role
+};
 
 export const authenticatedFetchAtom = atom<AuthAxios | undefined>({
     key: "bearerToken",
@@ -68,7 +74,7 @@ export namespace TokenAndRole {
 
 const AuthHeader = "Authorization";
 
-export const updateAuthenticatedFetchWithLoginResponse = async (response: Response, setter: SetterOrUpdater<AuthAxios | undefined>) => {
+export const updateAuthenticatedFetchWithLoginResponse = async (response: Response, setter: SetterOrUpdater<AuthAxios | undefined>, snackError: (err: any) => void) => {
     const updatedBearerToken = response.status === 401
         ? null
         : response.headers.get(AuthHeader);
@@ -76,7 +82,7 @@ export const updateAuthenticatedFetchWithLoginResponse = async (response: Respon
     setter(_ => {
         if (updatedBearerToken && role) {
             TokenAndRole.persist({ token: updatedBearerToken, role });
-            return createAuthenticatedFetch(updatedBearerToken, role, setter)
+            return createAuthenticatedFetch(updatedBearerToken, role, setter, snackError)
         } else {
             TokenAndRole.clean()
         }
@@ -84,19 +90,37 @@ export const updateAuthenticatedFetchWithLoginResponse = async (response: Respon
     return response;
 }
 
-export const createAuthenticatedFetch = (bearerToken: string, role: Role, setter: SetterOrUpdater<AuthAxios | undefined>): AuthAxios => {
+class IOHttp<T, U> {
+    constructor(private p: Promise<T>, private f: (t: T) => U, private err?: (error: any) => any, private catchAll?: (error: any) => any) {}
+    public map<V>(g: (t: U) => V) {
+        return new IOHttp(this.p, t => g(this.f(t)))
+    }
+    public flatMap<W, V>(g: (t: U) => IOHttp<W, V>, err?: (error: any) => any) {
+        return new IOHttp(this.p.then(t => g(this.f(t)).p, this.err), t => t, err, this.catchAll)
+    }
+    public get(): Promise<U> {
+        return this.p.then(this.f, this.err).catch(this.catchAll)
+    }
+}
+
+export const createAuthenticatedFetch = (bearerToken: string, role: Role, setter: SetterOrUpdater<AuthAxios | undefined>, snackError: (err: any) => void): AuthAxios => {
     const ax = axios.create({
         baseURL: "/api/",
         headers: { [AuthHeader]: bearerToken }
     });
 
-    ax.interceptors.response.use(undefined, err => {
+    const errorHandling = (err: any) => {
         if(err.response.status === 401) {
             TokenAndRole.clean();
             setter(undefined);
-        }
-        throw err;
-    })
+        } else snackError(err);
+    }
 
-    return {...ax, role } as AuthAxios;
+    return {
+        get: <T = any>(url: string) => new IOHttp(ax.get<T>(url), r => r.data, errorHandling, snackError).get(),
+        post: <T = any>(url: string, body: any) => new IOHttp(ax.post<T>(url, body), r => r.data, errorHandling, snackError).get(),
+        put: <T = any>(url: string, body: any) => new IOHttp(ax.put<T>(url, body), r => r.data, errorHandling, snackError).get(),
+        delete: <T = any>(url: string) => new IOHttp(ax.delete<T>(url), r => r.data, errorHandling, snackError).get(),
+        role
+    };
 };

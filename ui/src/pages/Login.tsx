@@ -12,7 +12,7 @@ import { makeStyles } from '@material-ui/core/styles';
 import Container from '@material-ui/core/Container';
 import { Credentials } from '../api/login';
 
-const Copyright = () => 
+const Copyright = () =>
     <Typography variant="body2" color="textSecondary" align="center">
       {'Copyright © Relions '}
       {new Date().getFullYear()}

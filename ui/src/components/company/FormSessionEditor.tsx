@@ -24,9 +24,9 @@ type EditorData = {
   invites: { user?: string, team?: string }[]
 };
 
-type APIProps = { apiSession: ReturnType<typeof FormSession.createApi>, apiForm: ReturnType<typeof Form.createApi>, apiInvite: ReturnType<typeof FormSessionInvite.createApi> }
+type APIProps = { apiSession: FormSession.Api, apiForm: Form.Api, apiInvite: FormSessionInvite.Api }
 
-export const FormSessionCRUD = ({ apiSession, apiForm, apiInvite }: APIProps & { apiForm: ReturnType<typeof Form.createApi> }) => {
+export const FormSessionCRUD = ({ apiSession, apiForm, apiInvite }: APIProps & { apiForm: Form.Api }) => {
   const { path, url } = useRouteMatch();
   const history = useHistory();
 
@@ -46,7 +46,7 @@ export const FormSessionCRUD = ({ apiSession, apiForm, apiInvite }: APIProps & {
   </div>;
 };
 
-const FormOverview = ({ apiSession }: { apiSession: ReturnType<typeof FormSession.createApi> }) => {
+const FormOverview = ({ apiSession }: { apiSession: FormSession.Api }) => {
   const classes = useStylesCRUD();
   const { path, url } = useRouteMatch();
 
@@ -135,7 +135,7 @@ const FormEdit = ({ apiSession, apiInvite, apiForm, back }: APIProps & { back: (
         submit={(data: FormSession.Update, invites: InvitesList, deletedInvites: InvitesList) => {
           const deletedPromises = Promise.all(deletedInvites.map(inv => apiInvite.delete(inv.id!)));
           const invitePromises = Promise.all(invites.map(inv => inv.id ? apiInvite.update(inv as FormSessionInvite.Update) : apiInvite.create(inv, data.id)));
-          return Promise.all([apiSession.update(data), invitePromises, deletedPromises]).catch(() => {});
+          return Promise.all([apiSession.update(data), invitePromises, deletedPromises]);
         }}
         back={back}
       />
@@ -148,7 +148,6 @@ const FormEdit = ({ apiSession, apiInvite, apiForm, back }: APIProps & { back: (
     submit={(data: FormSession.Create, invites: InvitesList) =>
       apiSession.create(data, data.formId)
         .then(formSession => Promise.all(invites.map(inv => apiInvite.create(inv, formSession.id))))
-        .catch(() => { })
     }
     back={back}
   />
