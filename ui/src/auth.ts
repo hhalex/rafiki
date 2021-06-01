@@ -1,5 +1,5 @@
-import axios, { AxiosInstance, AxiosResponse } from "axios";
 import { atom, SetterOrUpdater } from "recoil";
+import { NudeTk, Tk } from "./tk";
 
 export type User = {
     firstname?: string,
@@ -27,10 +27,10 @@ export namespace Role {
 }
 
 export type AuthAxios = {
-    get: <T>(url: string) => Promise<T>,
-    post: <T>(url: string, body?: any) => Promise<T>,
-    put: <T>(url: string, body?: any) => Promise<T>,
-    delete: <T>(url: string) => Promise<T>,
+    get: <T>(url: string) => Tk<T>,
+    post: <T>(url: string, body?: any) => Tk<T>,
+    put: <T>(url: string, body?: any) => Tk<T>,
+    delete: <T>(url: string) => Tk<T>,
     role: Role
 };
 
@@ -90,37 +90,30 @@ export const updateAuthenticatedFetchWithLoginResponse = async (response: Respon
     return response;
 }
 
-class IOHttp<T, U> {
-    constructor(private p: Promise<T>, private f: (t: T) => U, private err?: (error: any) => any, private catchAll?: (error: any) => any) {}
-    public map<V>(g: (t: U) => V) {
-        return new IOHttp(this.p, t => g(this.f(t)))
-    }
-    public flatMap<W, V>(g: (t: U) => IOHttp<W, V>, err?: (error: any) => any) {
-        return new IOHttp(this.p.then(t => g(this.f(t)).p, this.err), t => t, err, this.catchAll)
-    }
-    public get(): Promise<U> {
-        return this.p.then(this.f, this.err).catch(this.catchAll)
-    }
-}
 
-export const createAuthenticatedFetch = (bearerToken: string, role: Role, setter: SetterOrUpdater<AuthAxios | undefined>, snackError: (err: any) => void): AuthAxios => {
-    const ax = axios.create({
-        baseURL: "/api/",
-        headers: { [AuthHeader]: bearerToken }
+export const createAuthenticatedFetch = (bearerToken: string, role: Role, setter: SetterOrUpdater<AuthAxios | undefined>, snackError: (err: string) => void): AuthAxios => {
+    const headers = { [AuthHeader]: bearerToken };
+
+    const happyPath = <T>(res: Response): NudeTk<T> => ({
+        run: <U>(then: ((v: T) => U)) => {
+            if (res.status >= 200 && res.status < 300)
+                Tk.Pipe.toJson<T>(res, snackError).run(then)
+            // Authentication issue, must login again
+            else if(res.status === 401) {
+                TokenAndRole.clean();
+                setter(undefined);
+            } else res.text().then(snackError)
+            return {
+                cancel: () => false
+            };
+        }
     });
 
-    const errorHandling = (err: any) => {
-        if(err.response.status === 401) {
-            TokenAndRole.clean();
-            setter(undefined);
-        } else snackError(err);
-    }
-
     return {
-        get: <T = any>(url: string) => new IOHttp(ax.get<T>(url), r => r.data, errorHandling, snackError).get(),
-        post: <T = any>(url: string, body: any) => new IOHttp(ax.post<T>(url, body), r => r.data, errorHandling, snackError).get(),
-        put: <T = any>(url: string, body: any) => new IOHttp(ax.put<T>(url, body), r => r.data, errorHandling, snackError).get(),
-        delete: <T = any>(url: string) => new IOHttp(ax.delete<T>(url), r => r.data, errorHandling, snackError).get(),
+        get: <T = any>(url: string) => Tk.http({ url: `/api${url}`, headers }, snackError).flatMap<T>(happyPath),
+        post: <T = any>(url: string, body: any) => Tk.http({ url: `/api${url}`, body, headers, method: "POST" }, snackError).flatMap<T>(happyPath),
+        put: <T = any>(url: string, body: any) => Tk.http({ url: `/api${url}`, body, headers, method: "PUT" }, snackError).flatMap<T>(happyPath),
+        delete: <T = any>(url: string) => Tk.http({ url: `/api${url}`, headers, method: "DELETE" }, snackError).flatMap<T>(happyPath),
         role
     };
 };

@@ -31,7 +31,7 @@ export namespace Form {
     export type Api = ReturnType<typeof createApi>
 
     export const createApi = (authFetch: AuthAxios) => ({
-        create: (form: Create): Promise<Full> =>
+        create: (form: Create) =>
             authFetch.post<Full>("/company/form", form),
         update: (form: Update) =>
             authFetch.put<Full>(`/company/form/${form.id}`, form),

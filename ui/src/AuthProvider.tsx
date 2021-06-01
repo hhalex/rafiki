@@ -16,8 +16,8 @@ export const AuthProvider = ({ children }: any) => {
         <IconButton onClick={() => closeSnackbar(key)}>
             <Clear />
         </IconButton>
-    const snackError = (err: any) => {
-        enqueueSnackbar(`${err.name} - ${err.response.data}`, {
+    const snackError = (text: string) => {
+        enqueueSnackbar(text, {
             variant: "error",
             preventDuplicate: true,
             action

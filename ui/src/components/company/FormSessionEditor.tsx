@@ -12,6 +12,7 @@ import DoneIcon from '@material-ui/icons/Done';
 import { Link, Route, Switch, useHistory, useParams, useRouteMatch } from "react-router-dom";
 import { Form } from "../../api/company/form";
 import { FormSessionInvite } from "../../api/company/invite";
+import { Tk } from "../../tk";
 
 const useStylesCRUD = makeStyles({
   table: {},
@@ -52,11 +53,11 @@ const FormOverview = ({ apiSession }: { apiSession: FormSession.Api }) => {
 
   const [list, setList] = React.useState<FormSession.Full[]>([]);
 
-  const listEntries = () => apiSession.list().then(setList);
+  const listEntries = apiSession.list().map(setList);
   const deleteEntry = (formSessionId: string) =>
-    apiSession.delete(formSessionId).then(listEntries).catch(() => { });
+    apiSession.delete(formSessionId).andThen(listEntries);
 
-  useEffect(listEntries as any, []);
+  useEffect(listEntries.eval as any, []);
 
   const enum SessionState {
     PENDING = "PENDING",
@@ -80,11 +81,11 @@ const FormOverview = ({ apiSession }: { apiSession: FormSession.Api }) => {
         <ListItemText primary={formSession.name} secondary={sState} />
         <ListItemSecondaryAction>
           {(sState == SessionState.PENDING)
-            ? <IconButton onClick={() => apiSession.start(formSession.id).then(listEntries)}>
+            ? <IconButton onClick={apiSession.start(formSession.id).andThen(listEntries).eval}>
                 <PlayArrowIcon />
               </IconButton>
             : (sState == SessionState.STARTED)
-              ? <IconButton onClick={() => apiSession.finish(formSession.id).then(listEntries)}>
+              ? <IconButton onClick={apiSession.finish(formSession.id).andThen(listEntries).eval}>
                   <StopIcon />
                 </IconButton>
               : <IconButton disabled>
@@ -94,7 +95,7 @@ const FormOverview = ({ apiSession }: { apiSession: FormSession.Api }) => {
           <IconButton component={Link} to={`${url}/${formSession.id}`}>
             <EditIcon />
           </IconButton>
-          <IconButton onClick={() => deleteEntry(formSession.id)}>
+          <IconButton onClick={deleteEntry(formSession.id).eval}>
             <Clear />
           </IconButton>
         </ListItemSecondaryAction>
@@ -120,22 +121,22 @@ const FormEdit = ({ apiSession, apiInvite, apiForm, back }: APIProps & { back: (
   const { id } = useParams<{ id: any }>();
 
   const [forms, setForms] = React.useState<Form.Full[]>([]);
-  useEffect(() => apiForm.list().then(setForms) as any, []);
+  useEffect(apiForm.list().map(setForms).eval as any, []);
 
   if (id !== undefined) {
     const [data, setData] = React.useState<FormSession.Full & { invites: FormSessionInvite.Full[] } | undefined>(undefined);
     useEffect(() =>
-      Promise.all([apiSession.getById(id), apiInvite.listByFormSession(id)])
-        .then(([session, invites]) => setData({ ...session, invites })) as any, []);
+      Tk.all(apiSession.getById(id), apiInvite.listByFormSession(id))
+        .map(([session, invites]) => setData({ ...session, invites })).eval as any, []);
 
     return data
       ? <ValidatedForm
         forms={forms}
         initialValues={data as EditorData}
         submit={(data: FormSession.Update, invites: InvitesList, deletedInvites: InvitesList) => {
-          const deletedPromises = Promise.all(deletedInvites.map(inv => apiInvite.delete(inv.id!)));
-          const invitePromises = Promise.all(invites.map(inv => inv.id ? apiInvite.update(inv as FormSessionInvite.Update) : apiInvite.create(inv, data.id)));
-          return Promise.all([apiSession.update(data), invitePromises, deletedPromises]);
+          const deletedPromises = Tk.all(...deletedInvites.map(inv => apiInvite.delete(inv.id!)));
+          const invitePromises = Tk.all(...invites.flatMap(inv => inv.id ? apiInvite.update(inv as FormSessionInvite.Update) : apiInvite.create(inv, data.id)));
+          return Tk.all(apiSession.update(data), invitePromises, deletedPromises);
         }}
         back={back}
       />
@@ -147,7 +148,7 @@ const FormEdit = ({ apiSession, apiInvite, apiForm, back }: APIProps & { back: (
     initialValues={{ invites: [] }}
     submit={(data: FormSession.Create, invites: InvitesList) =>
       apiSession.create(data, data.formId)
-        .then(formSession => Promise.all(invites.map(inv => apiInvite.create(inv, formSession.id))))
+        .flatMap(formSession => Tk.all(...invites.map(inv => apiInvite.create(inv, formSession.id))))
     }
     back={back}
   />
@@ -273,7 +274,7 @@ const validationSchema = Yup.object({
     })
 });
 
-type SubmitF = ((_1: FormSession.Create, _2: InvitesList, deleted: InvitesList) => Promise<any>) | ((_1: FormSession.Update, _2: InvitesList, deleted: InvitesList) => Promise<any>);
+type SubmitF = ((_1: FormSession.Create, _2: InvitesList, deleted: InvitesList) => Tk<any>) | ((_1: FormSession.Update, _2: InvitesList, deleted: InvitesList) => Tk<any>);
 
 const ValidatedForm = ({ initialValues, back, forms, submit }: { initialValues: EditorData, forms: Form.Full[], back: () => void, submit: SubmitF }) => {
   const classes = useStylesVF();
@@ -289,10 +290,16 @@ const ValidatedForm = ({ initialValues, back, forms, submit }: { initialValues: 
     validationSchema={validationSchema}
     validateOnChange={false}
     onSubmit={(values) => {
+      // Compare current invites with initial ones, to find out which ones have been deleted
       const deletedInvites = initialValues.invites.filter(i => !values.invites.find(newInvites => newInvites.user === i.user))
-      submit({...values, invites: undefined} as any, values.invites as {user: string, team: string}[], deletedInvites as {user: string, team: string}[])
-      console.log(values);
-      back();
+      submit({
+          ...values,
+          invites: undefined
+        } as any,
+        values.invites as {user: string, team: string}[],
+        deletedInvites as {user: string, team: string}[]
+      )
+      .run(back)
     }}
   >{({ values, touched, errors, handleChange }) => (
     <FormikForm noValidate autoComplete="off">

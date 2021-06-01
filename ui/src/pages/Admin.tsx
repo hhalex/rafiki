@@ -9,6 +9,7 @@ import EditIcon from '@material-ui/icons/Edit';
 import DeleteIcon from '@material-ui/icons/Delete';
 import { Company } from '../api/company';
 import type { AuthAxios } from '../auth';
+import { Tk } from '../tk';
 
 const useStyles = makeStyles((theme: Theme) => ({
   root: {
@@ -141,10 +142,10 @@ const CompanyCRUD = ({authFetch}: {authFetch: AuthAxios}) => {
     setCompanyFormData(undefined);
   };
 
-  const loadCompanies = () => api.list().then(setCompaniesList);
+  const loadCompanies = api.list().map(setCompaniesList);
 
   const editOrAddCompany = (c: CompanyFormData) => {
-    const emptyPromise = new Promise<void>(_ => {});
+    const emptyPromise = Tk.noop;
     if (c.name && c.rh_user_email && c.rh_user_password !== undefined) {
 
       const data = {
@@ -160,23 +161,20 @@ const CompanyCRUD = ({authFetch}: {authFetch: AuthAxios}) => {
         // Password has to be a non empty string for user creation
         return c.rh_user_password.length > 0
           ? api.create(data)
-            .then(loadCompanies)
-            .catch(() => {})
+            .andThen(loadCompanies)
           : emptyPromise;
       }
-      
       return api.update({...data, id: c.id})
-        .then(loadCompanies)
-        .catch(() => {});
+        .andThen(loadCompanies)
     }
 
     return emptyPromise;
   };
 
   const deleteCompany = (companyId: string) =>
-    api.delete(companyId).then(loadCompanies).catch(() => {});
+    api.delete(companyId).andThen(loadCompanies);
 
-  useEffect(loadCompanies as any, []);
+  useEffect(loadCompanies.eval as any, []);
 
   const editOrAddLabel = companyFormData?.id ? "Editer" : "Ajouter";
 
@@ -201,7 +199,7 @@ const CompanyCRUD = ({authFetch}: {authFetch: AuthAxios}) => {
               <TableCell>{company.rh_user.username}</TableCell>
               <TableCell align="right">
                 <EditIcon className={classes.editIcon} onClick={() => initEditCompanyForm(company)}/>
-                <DeleteIcon className={classes.deleteIcon} onClick={() => deleteCompany(company.id)}/>
+                <DeleteIcon className={classes.deleteIcon} onClick={deleteCompany(company.id).eval}/>
               </TableCell>
             </TableRow>
           ))}
@@ -257,7 +255,7 @@ const CompanyCRUD = ({authFetch}: {authFetch: AuthAxios}) => {
         <Button onClick={handleClose} color="primary">
           Annuler
         </Button>
-        <Button onClick={() => editOrAddCompany(companyFormData).then(handleClose)} color="primary">
+        <Button onClick={editOrAddCompany(companyFormData).map(handleClose).eval} color="primary">
           {editOrAddLabel}
         </Button>
       </DialogActions>

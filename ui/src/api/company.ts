@@ -16,7 +16,7 @@ export namespace Company {
          * @param company Data describing the company with its user data.
          * @returns The newly created company and its user.
          */
-        create: (company: Create): Promise<Full> =>
+        create: (company: Create) =>
             authFetch.post<Full>("/admin/company", company),
         /**
          * @param company Data describing the company with its user data.

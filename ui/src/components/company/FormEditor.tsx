@@ -6,6 +6,7 @@ import { Formik, Form as FormikForm, Field as FormikField, getIn, FieldArray } f
 import { ArrowRightAltOutlined, Clear } from '@material-ui/icons';
 import AddIcon from '@material-ui/icons/Add';
 import { Link, Route, Switch, useHistory, useParams, useRouteMatch } from "react-router-dom";
+import { Tk } from "../../tk";
 
 const useStylesCRUD = makeStyles({
   table: {},
@@ -32,7 +33,7 @@ export const FormCRUD = ({ api }: APIProps) => {
       <Route path={`${path}/new`}>
         <ValidatedForm
           initialValues={{}}
-          submit={(data: Form.Create) => api.create(data)}
+          submit={api.create}
           back={backHome}
         />
       </Route>
@@ -51,11 +52,11 @@ const FormOverview = ({ api }: APIProps) => {
 
   const [list, setList] = React.useState<Form.Full[]>([]);
 
-  const listEntries = () => api.list().then(setList);
+  const listEntries = api.list().map(setList);
   const deleteEntry = (formId: string) =>
-    api.delete(formId).then(listEntries);
+    api.delete(formId).andThen(listEntries);
 
-  useEffect(listEntries as any, []);
+  useEffect(listEntries.eval as any, []);
 
   return <List className={classes.table}>
     {list.flatMap(form => ([
@@ -63,7 +64,7 @@ const FormOverview = ({ api }: APIProps) => {
       <ListItem key={form.id} button component={Link} to={`${url}/${form.id}`}>
         <ListItemText primary={form.name} secondary={form.description}/>
         <ListItemSecondaryAction>
-          <IconButton onClick={() => deleteEntry(form.id)}>
+          <IconButton onClick={deleteEntry(form.id).eval}>
             <Clear />
           </IconButton>
         </ListItemSecondaryAction>
@@ -88,12 +89,12 @@ const FormEdit = ({ api, back }: APIProps & { back: () => void }) => {
   const { id } = useParams<{ id: any }>();
   const [data, setData] = React.useState<Form.Full | undefined>(undefined);
 
-  useEffect(() => api.getById(id).then(setData) as any, []);
+  useEffect(api.getById(id).map(setData).run as any, []);
 
   return data
     ? <ValidatedForm
       initialValues={data as EditorData}
-      submit={(data: Form.Update) => api.update(data)}
+      submit={api.update}
       back={back}
     />
     : <div>Loading</div>
@@ -213,7 +214,7 @@ const validationSchema = Yup.object({
   })
 });
 
-const ValidatedForm = ({ initialValues, back, submit }: { initialValues: EditorData, back: () => void, submit: ((_: Form.Create) => Promise<any>) | ((_: Form.Update) => Promise<any>) }) => {
+const ValidatedForm = ({ initialValues, back, submit }: { initialValues: EditorData, back: () => void, submit: ((_: Form.Create) => Tk<any>) | ((_: Form.Update) => Tk<any>) }) => {
   const classes = useStylesVF();
   const editOrAddLabel = initialValues?.id ? "Editer" : "Ajouter";
 
@@ -228,7 +229,7 @@ const ValidatedForm = ({ initialValues, back, submit }: { initialValues: EditorD
     validateOnChange={false}
     onSubmit={(values) => {
       submit({...values, questions: undefined, tree: {id: initialValues.tree?.id, children: values.questions}} as any)
-        .then(back);
+        .run(back);
     }}
   >{({ values, touched, errors, handleChange }) => (
     <FormikForm noValidate autoComplete="off">

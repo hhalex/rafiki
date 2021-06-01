@@ -15,7 +15,7 @@ export namespace FormSessionInvite {
     export type Api = ReturnType<typeof createApi>
 
     export const createApi = (authFetch: AuthAxios) => ({
-        create: (formSessionInvite: Create, formSessionId: string): Promise<Full> =>
+        create: (formSessionInvite: Create, formSessionId: string) =>
             authFetch.post<Full>(`/company/session/${formSessionId}/invite`, formSessionInvite),
         update: (formSessionInvite: Update) =>
             authFetch.put<Full>(`/company/invite/${formSessionInvite.id}`, formSessionInvite),
