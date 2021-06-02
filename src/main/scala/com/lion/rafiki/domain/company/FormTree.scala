@@ -31,13 +31,15 @@ enum FormTreeP[+T]:
       answers: List[QuestionAnswer]
   ) extends FormTreeP[Nothing]
   case Group(children: List[T])
-  def withId(id: FormTree.Id) = WithId(id, this)
   def kind: FormTree.Kind = this match
     case _: Text        => FormTree.Kind.Text
     case _: Question    => FormTree.Kind.Question
     case _: Group[_]       => FormTree.Kind.Group
 end FormTreeP
 object FormTreeP:
+  extension [T <: FormTreeP[_]](ftp: T)
+    def withId(id: FormTree.Id): WithId[FormTree.Id, T] = WithId(id, ftp)
+
   given Functor[FormTreeP] with
     def map[A, B](fa: FormTreeP[A])(f: A => B): FormTreeP[B] = fa match
       case t: FormTreeP.Text => t
