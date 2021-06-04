@@ -38,6 +38,7 @@ import org.http4s.server.middleware.Logger
 import java.time.Clock
 import com.github.nscala_time.time.Imports.DateTime
 import scala.concurrent.ExecutionContext.global
+import com.lion.rafiki.domain.company.InviteAnswer
 
 object Main extends IOApp {
   def run(args: List[String]) = {
@@ -71,20 +72,20 @@ object Main extends IOApp {
 
         val formRepo = new DoobieFormRepo[IO](xa)
         val formValidation = new Form.FromRepoValidation[IO](formRepo)
-        val formService = new Form.Service[IO](formRepo, inviteAnswerRepo, formValidation)
+        val formService = new Form.Service[IO](formRepo, formValidation)
 
         val formSessionRepo = new DoobieFormSessionRepo[IO](xa)
-        val formSessionInviteRepo = new DoobieSessionInviteRepo[IO](xa)
+        val sessionInviteRepo = new DoobieSessionInviteRepo[IO](xa)
 
         val formSessionValidation = new FormSession.FromRepoValidation[IO](
           formSessionRepo,
           formValidation,
-          formSessionInviteRepo,
+          sessionInviteRepo,
           companyContractRepo
         )
 
-        val formSessionInviteValidation = new SessionInvite.FromRepoValidation[IO](
-          formSessionInviteRepo,
+        val sessionInviteValidation = new SessionInvite.FromRepoValidation[IO](
+          sessionInviteRepo,
           formSessionValidation
         )
 
@@ -92,11 +93,13 @@ object Main extends IOApp {
           new FormSession.Service[IO](formSessionRepo, formSessionValidation, DateTime.now)
 
         val formSessionInviteService = new SessionInvite.Service[IO](
-          formSessionInviteRepo,
-          formSessionInviteValidation,
+          sessionInviteRepo,
+          sessionInviteValidation,
           formSessionValidation,
           userService
         )
+
+        val inviteAnswerService = new InviteAnswer.Service[IO](inviteAnswerRepo, sessionInviteValidation)
 
         val privateKey = PrivateKey(
           scala.io.Codec.toUTF8(

@@ -38,6 +38,7 @@ object SessionInvite extends TaggedId[InviteId] {
     def update(sessionInvite: UpdateRecord): Result[Record]
     def get(id: Id): Result[(FormSession.Id, RecordWithEmail)]
     def getByUserEmail(email: String): Result[List[(FormSession.Id, RecordWithEmail)]]
+    def getByUserId(userId: User.Id): Result[List[(FormSession.Id, RecordWithEmail)]]
     def getByFormSession(id: FormSession.Id): Result[List[RecordWithEmail]]
     def delete(id: Id): Result[Unit]
     def list(pageSize: Int, offset: Int): Result[List[(FormSession.Id, SessionInvite.RecordWithEmail)]]
@@ -47,6 +48,8 @@ object SessionInvite extends TaggedId[InviteId] {
   trait Validation[F[_]] {
     def canCreateSessionInvite(formId: FormSession.Id, companyId: Company.Id): EitherT[F, ValidationError | RepoError, FormSession.Full]
     def hasOwnership(id: SessionInvite.Id, companyId: Company.Id): EitherT[F, ValidationError | RepoError, RecordWithEmail]
+    def hasUserOwnership(id: SessionInvite.Id, userId: User.Id): EitherT[F, ValidationError | RepoError, RecordWithEmail]
+    def isValidAnswer(answer: InviteAnswer, id: SessionInvite.Id): EitherT[F, ValidationError | RepoError, InviteAnswer]
   }
 
   class FromRepoValidation[F[_]: Monad](repo: Repo[F], formSessionValidation: FormSession.Validation[F]) extends Validation[F] {
@@ -59,6 +62,13 @@ object SessionInvite extends TaggedId[InviteId] {
       sessionInvite <- repo.get(id).leftWiden
       _ <- formSessionValidation.hasOwnership(sessionInvite._1, companyId)
     yield sessionInvite._2
+
+    override def hasUserOwnership(id: Id, userId: User.Id) = for
+      sessionInvites <- repo.getByUserId(userId).leftWiden
+      invite <- EitherT.fromOption(sessionInvites.find(_._2.id == id), ValidationError.NotAllowed)
+    yield invite._2
+
+    override def isValidAnswer(answer: InviteAnswer, id: SessionInvite.Id): EitherT[F, ValidationError | RepoError, InviteAnswer] = ???
   }
 
   class Service[F[_] : Monad](repo: Repo[F], validation: Validation[F], formSessionValidation: FormSession.Validation[F], userService: User.Service[F]) {

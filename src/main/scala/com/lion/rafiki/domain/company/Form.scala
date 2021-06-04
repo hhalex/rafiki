@@ -75,19 +75,11 @@ object Form extends TaggedId[FormId] {
 
   class Service[F[_]: Monad](
       repo: Repo[F],
-      inviteAnswerRepo: InviteAnswer.Repo[F],
       validation: Validation[F]
   ) {
     type Result[T] = EitherT[F, ValidationError | RepoError, T]
     def create(form: Create, companyId: Option[Company.Id]): Result[Full] =
-      (for
-        createdForm <- repo.create(form.copy(company = companyId))
-        answerTableName = s"form${createdForm.id}_answers"
-          .asInstanceOf[InviteAnswer.TableName]
-        _ <- createdForm.data.tree.traverse(t =>
-          inviteAnswerRepo.overrideAnswerTable(answerTableName, FormTree.labels(t))
-        )
-      yield createdForm).leftWiden
+      repo.create(form.copy(company = companyId)).leftWiden
 
     def getById(formId: Id, companyId: Option[Company.Id]): Result[Full] = for
       _ <- validation.hasOwnership(formId, companyId)
@@ -104,13 +96,6 @@ object Form extends TaggedId[FormId] {
         formDB <- validation.hasOwnership(form.id, companyId)
         result <- repo
           .update(form.mapData(_.copy(company = formDB.data.company)))
-          .leftWiden
-        answerTableName = s"form${result.id}_answers"
-          .asInstanceOf[InviteAnswer.TableName]
-        _ <- result.data.tree
-          .traverse(t =>
-            inviteAnswerRepo.overrideAnswerTable(answerTableName, FormTree.labels(t))
-          )
           .leftWiden
       yield result
 

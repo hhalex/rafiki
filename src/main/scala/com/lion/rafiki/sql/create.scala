@@ -155,6 +155,19 @@ object create {
          UNIQUE(form_session_id, user_id)
       )""".update
 
+   val formSessionInviteAnswers =
+      sql"""
+      CREATE TABLE IF NOT EXISTS form_session_invite_answers (
+         invite_id              bigint            NOT NULL,
+         question_answer_id     bigint            NOT NULL,
+         text                   text              ,
+         FOREIGN KEY (invite_id)
+            REFERENCES form_session_invites(id),
+         FOREIGN KEY (question_answer_id)
+            REFERENCES form_tree_question_answers(id),
+         PRIMARY KEY (invite_id, question_answer_id)
+      )""".update
+
   val allTables = (
     users.run,
     companies.run,
@@ -162,6 +175,7 @@ object create {
     formTrees.run,
     forms.run,
     formSessions.run,
-    formSessionInvites.run
-  ).mapN(_ + _ + _ + _ + _ + _ + _).as(())
+    formSessionInvites.run,
+    formSessionInviteAnswers.run
+  ).mapN(_ + _ + _ + _ + _ + _ + _ + _).as(())
 }
