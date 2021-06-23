@@ -6,3 +6,5 @@ ui/build
 .bloop/
 .ammonite/
 metals.sbt
+.bsp/
+.vscode/
