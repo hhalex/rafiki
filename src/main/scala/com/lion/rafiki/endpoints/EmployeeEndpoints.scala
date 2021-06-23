@@ -32,7 +32,6 @@ class EmployeeEndpoints[F[_]: Async] extends Http4sDsl[F] {
       AuthedRoutes.of[User.Id, F] {
         // Create answer
         case req @ POST -> Root / InviteRoute / SessionInviteIdVar(sessionInviteId) / AnswerRoute as userId =>
-
           val action = for
             answer <- req.req.attemptAs[InviteAnswer.Create].leftWiden
             result <- inviteAnswerService.create(answer, sessionInviteId, userId).leftWiden
@@ -40,8 +39,9 @@ class EmployeeEndpoints[F[_]: Async] extends Http4sDsl[F] {
 
           action.value.flatMap {
             case Right(form) => Ok(form)
-            case Left(err) => BadRequest(s"Error '$err' while creating form.")
+            case Left(err) => BadRequest(s"Error '$err' while creating answer.")
           }
+        // Update answer
         case req @ PUT -> Root / InviteRoute / SessionInviteIdVar(inviteAnswerId) / AnswerRoute as userId =>
           val action = for
             answer <- req.req.attemptAs[InviteAnswer.Create].leftWiden
@@ -50,7 +50,7 @@ class EmployeeEndpoints[F[_]: Async] extends Http4sDsl[F] {
 
           action.value.flatMap {
             case Right(form) => Ok(form)
-            case Left(err) => BadRequest(s"Error '$err' while creating form.")
+            case Left(err) => BadRequest(s"Error '$err' while updating answer.")
           }/*
         // Update form
         case req @ PUT -> Root / FormRoute / FormIdVar(id) as companyUser =>

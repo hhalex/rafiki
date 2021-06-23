@@ -3,13 +3,11 @@ package com.lion.rafiki.domain.company
 import com.lion.rafiki.domain.WithId
 import com.lion.rafiki.domain.{RepoError, WithId}
 import cats.data.EitherT
-import io.circe.{Decoder, Encoder}
+import io.circe.{Decoder, Encoder, KeyDecoder, KeyEncoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import com.lion.rafiki.domain.{TaggedId, ValidationError, User}
 import cats.Monad
 import cats.syntax.all._
-import _root_.io.circe.KeyDecoder
-import _root_.io.circe.KeyEncoder
 
 case class InviteAnswer(values: Map[QuestionAnswer.Id, Option[String]]):
   def withId(id: SessionInvite.Id) = WithId(id, this)
@@ -43,13 +41,13 @@ object InviteAnswer {
   }
   class Service[F[_]: Monad](repo: Repo[F], sessionInviteValidation: SessionInvite.Validation[F]) {
     type Result[T] = EitherT[F, ValidationError | RepoError, T]
-    def create(inviteAnswer: Create, sessionInviteId: Id, userId: User.Id): EitherT[F, ValidationError | RepoError, Record] = for
+    def create(inviteAnswer: Create, sessionInviteId: Id, userId: User.Id): Result[Record] = for
       _ <- sessionInviteValidation.hasUserOwnership(sessionInviteId, userId).leftWiden
       _ <- sessionInviteValidation.isValidAnswer(inviteAnswer, sessionInviteId).leftWiden
       createdInviteAnswer <- repo.create(inviteAnswer, sessionInviteId).leftWiden
     yield createdInviteAnswer
 
-    def update(inviteAnswer: Update, userId: User.Id): EitherT[F, ValidationError | RepoError, Record] = for
+    def update(inviteAnswer: Update, userId: User.Id): Result[Record] = for
       _ <- sessionInviteValidation.hasUserOwnership(inviteAnswer.id, userId).leftWiden
       _ <- sessionInviteValidation.isValidAnswer(inviteAnswer.data, inviteAnswer.id).leftWiden
       updatedInviteAnswer <- repo.update(inviteAnswer).leftWiden
