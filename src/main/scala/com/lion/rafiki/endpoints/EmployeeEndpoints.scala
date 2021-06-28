@@ -51,6 +51,12 @@ class EmployeeEndpoints[F[_]: Async] extends Http4sDsl[F] {
           action.value.flatMap {
             case Right(form) => Ok(form)
             case Left(err) => BadRequest(s"Error '$err' while updating answer.")
+          }
+        // Delete answer
+        case req @ DELETE -> Root / InviteRoute / SessionInviteIdVar(inviteAnswerId) / AnswerRoute as userId =>
+          inviteAnswerService.delete(inviteAnswerId, userId).value.flatMap {
+            case Right(form) => Ok(form)
+            case Left(err) => BadRequest(s"Error '$err' while deleting answer.")
           }/*
         // Update form
         case req @ PUT -> Root / FormRoute / FormIdVar(id) as companyUser =>

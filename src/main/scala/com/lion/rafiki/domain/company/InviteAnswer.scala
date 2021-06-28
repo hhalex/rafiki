@@ -52,5 +52,10 @@ object InviteAnswer {
       _ <- sessionInviteValidation.isValidAnswer(inviteAnswer.data, inviteAnswer.id).leftWiden
       updatedInviteAnswer <- repo.update(inviteAnswer).leftWiden
     yield updatedInviteAnswer
+
+    def delete(inviteAnswerId: Id, userId: User.Id): Result[Unit] = for
+      _ <- sessionInviteValidation.hasUserOwnership(inviteAnswerId, userId).leftWiden
+      _ <- repo.delete(inviteAnswerId).leftWiden
+    yield ()
    }
 }
