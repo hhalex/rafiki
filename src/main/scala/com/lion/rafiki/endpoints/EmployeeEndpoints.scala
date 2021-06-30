@@ -24,9 +24,7 @@ class EmployeeEndpoints[F[_]: Async] extends Http4sDsl[F] {
   // SessionInvites and SessionAnswer have exactly the same id
   object SessionInviteIdVar extends IdVar[SessionInvite.Id](SessionInvite.tag)
 
-  def endpoints(formService: Form.Service[F],
-                formSessionService: FormSession.Service[F],
-                inviteAnswerService: InviteAnswer.Service[F],
+  def endpoints(inviteAnswerService: InviteAnswer.Service[F],
                 sessionInviteService: SessionInvite.Service[F],
                 userAuth: UserAuth[F]): HttpRoutes[F] = userAuth.authEmployee {
       AuthedRoutes.of[User.Id, F] {
@@ -57,7 +55,18 @@ class EmployeeEndpoints[F[_]: Async] extends Http4sDsl[F] {
           inviteAnswerService.delete(inviteAnswerId, userId).value.flatMap {
             case Right(form) => Ok(form)
             case Left(err) => BadRequest(s"Error '$err' while deleting answer.")
-          }/*
+          }
+        // Get invites per employee
+        case req @ GET -> Root / InviteRoute :? OptionalPageSizeMatcher(pageSize) :? OptionalOffsetMatcher(offset) as userId =>
+          val action = (pageSize, offset) match
+            case (None, None) => sessionInviteService.getWithAnswerByUser(userId)
+            case _ => sessionInviteService.listWithAnswerByUser(userId, pageSize.getOrElse(10), offset.getOrElse(0))
+
+          action.value.flatMap {
+            case Right(form) => Ok(form)
+            case Left(err) => BadRequest(s"Error '$err' while getting invites.")
+          }
+          /*
         // Update form
         case req @ PUT -> Root / FormRoute / FormIdVar(id) as companyUser =>
           val action = for

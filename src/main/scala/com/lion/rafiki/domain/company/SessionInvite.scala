@@ -16,6 +16,7 @@ object SessionInvite extends TaggedId[InviteId] {
 
   import User.Id.given
   import Id.given
+  import FormSession.Id.given
   type Create = SessionInvite[User.Create]
   type CreateRecord = SessionInvite[User.Id]
   type Update = WithId[Id, Create]
@@ -31,6 +32,7 @@ object SessionInvite extends TaggedId[InviteId] {
   given Encoder[Full] = WithId.deriveEncoder
   given Encoder[RecordWithEmail] = WithId.deriveEncoder
   given Encoder[Record] = WithId.deriveEncoder
+  given Encoder[(FormSession.Id, RecordWithEmail, Option[InviteAnswer.Record])] = deriveEncoder
 
   trait Repo[F[_]] {
     type Result[T] = EitherT[F, RepoError, T]
@@ -41,7 +43,8 @@ object SessionInvite extends TaggedId[InviteId] {
     def getByUserId(userId: User.Id): Result[List[(FormSession.Id, RecordWithEmail)]]
     def getByFormSession(id: FormSession.Id): Result[List[RecordWithEmail]]
     def delete(id: Id): Result[Unit]
-    def list(pageSize: Int, offset: Int): Result[List[(FormSession.Id, SessionInvite.RecordWithEmail)]]
+    def list(pageSize: Int, offset: Int): Result[List[(FormSession.Id, RecordWithEmail)]]
+    def listByUserId(userId: User.Id, pageSize: Int, offset: Int): Result[List[(FormSession.Id, RecordWithEmail)]]
     def listByFormSession(formSessionId: FormSession.Id, pageSize: Int, offset: Int): Result[List[RecordWithEmail]]
   }
 
@@ -71,7 +74,7 @@ object SessionInvite extends TaggedId[InviteId] {
     override def isValidAnswer(answer: InviteAnswer, id: SessionInvite.Id): EitherT[F, ValidationError | RepoError, InviteAnswer] = ???
   }
 
-  class Service[F[_] : Monad](repo: Repo[F], validation: Validation[F], formSessionValidation: FormSession.Validation[F], userService: User.Service[F]) {
+  class Service[F[_] : Monad](repo: Repo[F], answersRepo: InviteAnswer.Repo[F], validation: Validation[F], formSessionValidation: FormSession.Validation[F], userService: User.Service[F]) {
     type Result[T] = EitherT[F, ValidationError | RepoError, T]
 
     def create(sessionInvite: SessionInvite[String], formSessionId: FormSession.Id, companyId: Company.Id): EitherT[F, ValidationError | RepoError | PasswordError, Full] = for
@@ -102,6 +105,32 @@ object SessionInvite extends TaggedId[InviteId] {
       _ <- formSessionValidation.hasOwnership(formSessionId, companyId)
       list <- repo.listByFormSession(formSessionId, pageSize, offset).leftWiden
     yield list
+
+    def listByUser(userId: User.Id, pageSize: Int, offset: Int): Result[List[(FormSession.Id, RecordWithEmail)]] = repo.listByUserId(userId, pageSize, offset).leftWiden
+
+    def getByUser(userId: User.Id): Result[List[(FormSession.Id, RecordWithEmail)]] = repo.getByUserId(userId).leftWiden
+
+    def listWithAnswerByUser(userId: User.Id, pageSize: Int, offset: Int): Result[List[(FormSession.Id, RecordWithEmail, Option[InviteAnswer.Record])]] = for
+      list <- repo.listByUserId(userId, pageSize, offset).leftWiden
+      answers <- list.traverse {
+        case t@(id, record) => answersRepo.get(record.id).transform {
+          case Right(data) => Right((id, record, Some(data)))
+          case Left(RepoError.NotFound) => Right((id, record, None))
+          case Left(e) => Left(e)
+        }
+      }
+    yield answers
+
+    def getWithAnswerByUser(userId: User.Id): Result[List[(FormSession.Id, RecordWithEmail, Option[InviteAnswer.Full])]] = for
+      list <- repo.getByUserId(userId).leftWiden
+      answers <- list.traverse {
+        case t@(id, record) => answersRepo.get(record.id).transform {
+          case Right(data) => Right((id, record, Some(data)))
+          case Left(RepoError.NotFound) => Right((id, record, None))
+          case Left(e) => Left(e)
+        }
+      }
+    yield answers
 
     def getByFormSession(formSessionId: FormSession.Id, companyId: Company.Id): Result[List[RecordWithEmail]] = for
       _ <- formSessionValidation.hasOwnership(formSessionId, companyId)

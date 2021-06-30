@@ -39,6 +39,7 @@ import java.time.Clock
 import com.github.nscala_time.time.Imports.DateTime
 import scala.concurrent.ExecutionContext.global
 import com.lion.rafiki.domain.company.InviteAnswer
+import com.lion.rafiki.endpoints.EmployeeEndpoints
 
 object Main extends IOApp {
   def run(args: List[String]) = {
@@ -92,8 +93,9 @@ object Main extends IOApp {
         val formSessionService =
           new FormSession.Service[IO](formSessionRepo, formSessionValidation, DateTime.now)
 
-        val formSessionInviteService = new SessionInvite.Service[IO](
+        val sessionInviteService = new SessionInvite.Service[IO](
           sessionInviteRepo,
+          inviteAnswerRepo,
           sessionInviteValidation,
           formSessionValidation,
           userService
@@ -127,14 +129,17 @@ object Main extends IOApp {
           new CompanyBusinessEndpoints[IO]().endpoints(
             formService,
             formSessionService,
-            formSessionInviteService,
+            sessionInviteService,
             userAuth
           )
+
+        val employeeEndpoints = new EmployeeEndpoints[IO]().endpoints(inviteAnswerService, sessionInviteService, userAuth)
 
         val httpApp = Router(
           "/" -> (authEndpoints <+> Routes.uiRoutes),
           "/api" -> Router(
             "/company" -> companyBusinessEndpoints,
+            "/employee" -> employeeEndpoints,
             "/admin" -> (companyEndpoints <+> userEndpoints)
           )
         ).orNotFound

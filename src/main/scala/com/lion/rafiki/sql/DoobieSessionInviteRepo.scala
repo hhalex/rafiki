@@ -64,6 +64,13 @@ private[sql] object SessionInviteSQL {
   ) =
     paginate(pageSize: Int, offset: Int)(byFormSessionQ(formSessionId))
 
+  def listByUserIdQ(
+      userId: User.Id,
+      pageSize: Int,
+      offset: Int
+  ) =
+    paginate(pageSize: Int, offset: Int)(byUserIdQ(userId))
+
   def listAllQ(pageSize: Int, offset: Int) =
     paginate(pageSize, offset)(
       listFullInvitesFragment
@@ -141,6 +148,16 @@ class DoobieSessionInviteRepo[F[_]: TaglessMonadCancel](
   ) =
     listBySessionQ(formSessionId, pageSize, offset)
       .map(_._2)
+      .to[List]
+      .toResult()
+      .transact(xa)
+
+  override def listByUserId(
+      userId: User.Id,
+      pageSize: Int,
+      offset: Int
+  ) =
+    listByUserIdQ(userId, pageSize, offset)
       .to[List]
       .toResult()
       .transact(xa)
