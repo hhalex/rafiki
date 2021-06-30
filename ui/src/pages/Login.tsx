@@ -11,6 +11,7 @@ import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/core/styles';
 import Container from '@material-ui/core/Container';
 import { Credentials } from '../api/login';
+import { Tk } from '../tk';
 
 const Copyright = () =>
     <Typography variant="body2" color="textSecondary" align="center">
@@ -39,14 +40,14 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-export const Login = ({api}: {api: (creds: Credentials) => Promise<Response>}) => {
+export const Login = ({api}: {api: (creds: Credentials) => Tk<Response>}) => {
   const classes = useStyles();
 
   const [credentials, setCredentials] = React.useState<Credentials>({ username: "", password: "" });
 
   const onSubmit: React.FormEventHandler = e => {
     e.preventDefault();
-    return api(credentials);
+    return api(credentials).eval();
   }
 
   return (

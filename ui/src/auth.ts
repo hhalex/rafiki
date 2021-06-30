@@ -74,21 +74,30 @@ export namespace TokenAndRole {
 
 const AuthHeader = "Authorization";
 
-export const updateAuthenticatedFetchWithLoginResponse = async (response: Response, setter: SetterOrUpdater<AuthAxios | undefined>, snackError: (err: any) => void) => {
-    const updatedBearerToken = response.status === 401
-        ? null
-        : response.headers.get(AuthHeader);
-    const role = Role.fromStr(await response.text());
-    setter(_ => {
-        if (updatedBearerToken && role) {
-            TokenAndRole.persist({ token: updatedBearerToken, role });
-            return createAuthenticatedFetch(updatedBearerToken, role, setter, snackError)
-        } else {
-            TokenAndRole.clean()
+export const updateAuthFetchWithLoginResponse = (setter: SetterOrUpdater<AuthAxios | undefined>, snackError: (err: any) => void) => (response: Response): NudeTk<Response> => ({
+    run: <U>(then: ((res: Response) => U)) => {
+        if (response.status >= 200 && response.status < 300) {
+            const updatedBearerToken = response.status === 401
+                ? null
+                : response.headers.get(AuthHeader);
+            response.text().then(t => {
+                const role = Role.fromStr(t);
+                setter(_ => {
+                    if (updatedBearerToken && role) {
+                        TokenAndRole.persist({ token: updatedBearerToken, role });
+                        return createAuthenticatedFetch(updatedBearerToken, role, setter, snackError)
+                    } else {
+                        TokenAndRole.clean()
+                    }
+                });
+                then(response);
+            }, snackError);
+        } else response.text().then(snackError);
+        return {
+            cancel: () => false
         }
-    });
-    return response;
-}
+    }
+});
 
 
 export const createAuthenticatedFetch = (bearerToken: string, role: Role, setter: SetterOrUpdater<AuthAxios | undefined>, snackError: (err: string) => void): AuthAxios => {

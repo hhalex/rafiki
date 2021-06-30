@@ -3,11 +3,9 @@ import { Clear } from "@material-ui/icons";
 import { SnackbarKey, useSnackbar } from "notistack";
 import React, { useEffect } from "react";
 import { useRecoilState } from "recoil";
-import { createLoginApi } from "./api/login";
-import { authenticatedFetchAtom, createAuthenticatedFetch, updateAuthenticatedFetchWithLoginResponse, AuthAxios, TokenAndRole } from "./auth";
+import { createLoginApi, Credentials } from "./api/login";
+import { authenticatedFetchAtom, createAuthenticatedFetch, updateAuthFetchWithLoginResponse, AuthAxios, TokenAndRole } from "./auth";
 import { Login } from "./pages/Login";
-
-
 
 export const AuthProvider = ({ children }: any) => {
     const [authFetch, setAuthFetch] = useRecoilState(authenticatedFetchAtom);
@@ -37,7 +35,7 @@ export const AuthProvider = ({ children }: any) => {
 
 
     const LoginModal = () => {
-        const loginApi = createLoginApi(r => updateAuthenticatedFetchWithLoginResponse(r, setAuthFetch, snackError));
+        const loginApi = (creds: Credentials) => createLoginApi(creds).flatMap(updateAuthFetchWithLoginResponse(setAuthFetch, snackError));
         return <Dialog open={true} aria-labelledby="form-dialog-title">
             <DialogContent>
                 <Login api={loginApi} />
