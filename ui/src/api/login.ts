@@ -6,5 +6,5 @@ export const createLoginApi = (credentials: Credentials) =>
     Tk.http({
         url: "/login",
         method: "POST",
-        body: JSON.stringify(credentials)
+        body: credentials
     });
